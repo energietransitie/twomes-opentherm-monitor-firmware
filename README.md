@@ -1,5 +1,7 @@
-# twomes-repository template
-A template repository for the Twomes project.
+# Twomes OpenTherm Monitor firmware
+This repository contains the firmware and pointerr to binary releases for the  Twomes OpenTherm Monitor. 
+
+For the associated hardware design files for the OpenTherm Monitor Shield and enclosure and tips and instructions how to produce and assemble the hardware, please see the [twomes-opentherm-monitor-hardware](https://github.com/energietransitie/twomes-opentherm-monitor-hardware) repository. 
 
 ## Table of contents
 * [General info](#general-info)
@@ -12,24 +14,17 @@ A template repository for the Twomes project.
 * [Credits](#credits)
 
 ## General info
-Add more general information about the repo. What is purpose of the code in the repo? Motivation?
+The OpenTherm Monitor should be connected via one wire pair to a [boiler that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#boilers) and via another wire pair to a [thermostat that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#thermostats). 
+
+This is device  is NOT an OpenTherm gateway; it only monitors OpenTherm traffic and it cannot insert OpenTherm commands to the boiler or thermostat.
+
 
 ## Prerequisites
-Describe which (hardware and) software you need before you can deploy the software or develop with the source code. If the prerequisites are different for deploying users and developing users, you may want to move the prerequisites section as a subsection of each of those sections.
+In addition to the [prerequisites described in the generic formware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#prerequisites), you need:
+* a [Twomes OpenTherm Monitor Shield](https://github.com/energietransitie/twomes-opentherm-monitor-hardware)
 
 ## Deploying
-Describe how the reader can download and install the lastest installable version(s). If appropriate, link to the latest binary release or package you published in the repo. If needed, describe this for different platforms.
-Use steps if the procedure is non-trivial:
-1. first step;
-2. second step;
-3. final step.
-
-Format any scripts or commands in a way that makes them  easy to copy, like the following example. 
-
-Forgotten your Wi-Fi password? No problem with the follwing command, replacing `SSID` with the Wi-Fi name of your own Wi-Fi network: 
-```shell
-netsh wlan show profile SSID key=clear
-```
+See [Deploying section of the generic formware for Twomes measurement devices]](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
 
 ## Developing
 Describe how the reader can use / adapt/ compile the souce code. 
@@ -47,7 +42,7 @@ To-do:
 * wow improvement to be done 2.
 
 ## Status
-Project is: _in progress_, _finished_, _no longer continue_ and why?
+Project is: _in progress_
 
 ## License
 This software is available under the [Apache 2.0 license](./LICENSE), Copyright 2021 [Research group Energy Transition, Windesheim University of Applied Sciences](https://windesheim.nl/energietransitie) 
@@ -62,7 +57,5 @@ This software is a collaborative effort the following students and researchers:
 
 We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
 
-* [library name 1 and version](library 1 URL), by <copyright holder name 1>, licensed under [license 1 name](license1 URL)
-* [library name 2 and version](library 2 URL), by <copyright holder name 2>, licensed under [license 2 name](license2 URL)
-* [library name 3 and version](library 3 URL), by <copyright holder name 3>, licensed under [license 3 name](license3 URL)
-* etc. 
+* [Arduino](https://github.com/arduino/Arduino), by the Arduino team, licensed under [GNU LGPL v2.1](https://github.com/arduino/Arduino/blob/master/license.txt)
+* [OpenTherm Arduino/ESP8266 Library](https://github.com/ihormelnyk/opentherm_library/), by Ihor Melnyk, licensed under [MIT License](https://github.com/ihormelnyk/opentherm_library/blob/master/LICENSE)

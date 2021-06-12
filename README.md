@@ -20,11 +20,11 @@ This is device  is NOT an OpenTherm gateway; it only monitors OpenTherm traffic 
 
 
 ## Prerequisites
-In addition to the [prerequisites described in the generic formware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#prerequisites), you need:
+In addition to the [prerequisites described in the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#prerequisites), you need:
 * a [Twomes OpenTherm Monitor Shield](https://github.com/energietransitie/twomes-opentherm-monitor-hardware)
 
 ## Deploying
-See [Deploying section of the generic formware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
+See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
 
 ## Developing
 Describe how the reader can use / adapt/ compile the souce code. 

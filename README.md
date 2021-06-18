@@ -25,6 +25,7 @@ In addition to the [prerequisites described in the generic firmware for Twomes m
 
 ## Deploying
 See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
+A good tip is also to use the ESP-IDF VSCode plugin for building the main branch. Not needed for OpenTherm-Port branch: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/vscode-setup.html.
 
 ## Developing
 Describe how the reader can use / adapt/ compile the souce code. 

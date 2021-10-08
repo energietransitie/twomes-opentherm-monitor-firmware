@@ -42,7 +42,7 @@ Prerequisites for deploying, plus:
   * For `Enter ESP-IDF directory (IDF_PATH)` navitate to `%userprofile%\.platformio\platforms\espressif32`,(where %userprofile% is your home directory, which may not have spaces in its path)
   * Leave the `Enter ESP-IDF Tools directory (IDF_TOOLS_PATH)` as is.
 
-A good tip is also to use the ESP-IDF VSCode plugin for building the main branch. Not needed for OpenTherm-Port branch: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/vscode-setup.html.
+Old text in this section was: "A good tip is also to use the ESP-IDF VSCode plugin for building the main branch. Not needed for OpenTherm-Port branch: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/vscode-setup.html."
 
 ## Features
 List of features ready and TODOs for future development. Ready:

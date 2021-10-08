@@ -28,7 +28,20 @@ See [Deploying section of the generic firmware for Twomes measurement devices](h
 
 
 ## Developing
-Describe how the reader can use / adapt/ compile the souce code. 
+
+### Prerequisites for developing
+NOTE: This section is still under (re)construction...
+Prerequisites for deploying, plus:
+*	[Visual Studio Code](https://code.visualstudio.com/download) installed
+*	[PlatformIO for Visual Studio Code](https://platformio.org/install/ide?install=vscode) installed
+*	This GitHub repository cloned
+*	[ESP-IDF plugin for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) installed; make sure you satisfy all prerequisites, which may include
+  * the GitHub reposotory [ESP-IDF](https://github.com/espressif/esp-idf.git) cloned 
+  * In Visual Studio Code, this opens the ESP-IDF setup window
+  * For `Select ESP-IDF version:` choose the oprion `Find ESP-IDF in your system`;
+  * For `Enter ESP-IDF directory (IDF_PATH)` navitate to `%userprofile%\.platformio\platforms\espressif32`,(where %userprofile% is your home directory, which may not have spaces in its path)
+  * Leave the `Enter ESP-IDF Tools directory (IDF_TOOLS_PATH)` as is.
+
 A good tip is also to use the ESP-IDF VSCode plugin for building the main branch. Not needed for OpenTherm-Port branch: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/vscode-setup.html.
 
 ## Features

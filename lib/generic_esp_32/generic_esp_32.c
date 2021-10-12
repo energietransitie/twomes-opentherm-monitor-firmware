@@ -466,8 +466,8 @@ void prepare_device(const char *device_type_name)
     snprintf(qr_code_payload, qr_code_payload_size, qr_code_payload_template, device_name, dat, dat);
 #endif
 
-    ESP_LOGI(TAG, "QR Code Payload: ");
-    ESP_LOGI(TAG, "%s", qr_code_payload);
+    ESP_LOGE(TAG, "QR Code Payload: ");
+    ESP_LOGE(TAG, "%s", qr_code_payload);
     free(qr_code_payload);
 
     char *post_device_payload_template = "\n\n{\"name\":\"%s\",\"device_type\":\"%s\",\"activation_token\":\"%u\"}\n\n";
@@ -475,8 +475,8 @@ void prepare_device(const char *device_type_name)
     char *post_device_payload = malloc(post_device_payload_size);
     snprintf(post_device_payload, post_device_payload_size, post_device_payload_template, device_name, device_type_name, dat);
 
-    ESP_LOGI(TAG, "POST /device payload: ");
-    ESP_LOGI(TAG, "%s", post_device_payload);
+    ESP_LOGE(TAG, "POST /device payload: ");
+    ESP_LOGE(TAG, "%s", post_device_payload);
     free(post_device_payload);
     free(device_name);
 }

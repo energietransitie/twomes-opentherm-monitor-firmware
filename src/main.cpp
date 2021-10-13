@@ -1,25 +1,28 @@
-/* Hello World Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include "Arduino.h"
 #include "OpenTherm.h"
+
 extern "C"
 {
-#include "generic_esp_32.h"
+#include <generic_esp_32.h>
 }
 #include "driver/timer.h"
+
+#ifdef ARDUINO_ARCH_ESP32
+#include "esp32-hal-log.h"
+#endif
+
+#define BOOT_STARTUP_INTERVAL_MS (10 * 60) // milliseconds ( 10 s * 1000 ms/s)
+#define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
+
+#define DEVICE_TYPE_NAME "OpenTherm-Monitor"
+static const char *TAG = "Twomes ESP32 Arduiono framework based OpenTherm Monitor";
 
 #define DEBUG
 #define LED_BUILTIN 32
 #define LED LED_BUILTIN
 #define HTTP_TIMEOUT 3
 #define SSL_TIMEOUT 3
-#define DEVICE_TYPE_NAME "OpenTherm-Monitor"
+
 #define BOILER_MEASUREMENT_INTERVAL 10
 #define ROOM_TEMP_MEASUREMENT_INTERVAL 300
 #define REGULAR_MEASUREMENT_INTERVAL 30
@@ -34,6 +37,8 @@ int room_temp_count = 0;
 #define REGULAR_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / REGULAR_MEASUREMENT_INTERVAL
 int regular_measurement_count = 0;
 
+#define TIMER_DIVIDER 80
+
 int ch_mode_data[REGULAR_MEASUREMENT_MAX];                                 // Central heating mode (ON/OFF)
 int dhw_mode_data[REGULAR_MEASUREMENT_MAX];                                // Domestic hot water mode (ON/OFF)
 int flame_data[REGULAR_MEASUREMENT_MAX];                                   // Burner status (ON/OFF)
@@ -45,18 +50,6 @@ char maxRelModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Ma
 int minModLvl_data[REGULAR_MEASUREMENT_MAX];                               // Minimum modulation level
 char relModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Relative modulation level
 int maxBoilerCapStorage_data[REGULAR_MEASUREMENT_MAX];                     // Maximum boiler capacity
-
-#define TIMER_DIVIDER 80
-
-#define HEARTBEAT_UPLOAD_INTERVAL 3600000     //ms, so one hour
-#define HEARTBEAT_MEASUREMENT_INTERVAL 600000 //ms, so 10 minutes; not yet in effect
-
-static const char *TAG = "Twomes ESP32 generic test device";
-
-const char *device_activation_url = TWOMES_TEST_SERVER "/device/activate";
-const char *variable_interval_upload_url = TWOMES_TEST_SERVER "/device/measurements/variable-interval";
-
-char *bearer;
 
 const int mInPin = 21;  //for Arduino, 4 for ESP8266 (D2), 21 for ESP32
 const int mOutPin = 22; //for Arduino, 5 for ESP8266 (D1), 22 for ESP32
@@ -90,8 +83,6 @@ const char *max_rel_mod_lvl_name = "maxRelModLvl";
 const char *min_mod_lvl_name = "minModLvl";
 const char *rel_mod_lvl_name = "relModLvl";
 const char *max_boiler_cap_name = "maxBoilerCap";
-
-const char *root_cert = get_root_ca();
 
 char hex[5];     // Max 4 hex chars (two bytes) + null-terminator
 int pointer = 0; // Used to keep track of position of received character
@@ -157,7 +148,7 @@ bool IRAM_ATTR timer_group_isr_callback(void *args) {
 }
 
 //int timer_interval in microseconds
-void initialize_timer(timer_group_t group, timer_idx_t timer, bool auto_reload, int timer_interval) {
+void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool auto_reload, int timer_interval) {
     /* Select and initialize basic parameters of the timer */
     timer_config_t config = {
         .alarm_en = TIMER_ALARM_EN,
@@ -186,7 +177,7 @@ void processSlaveRequest(unsigned long request, OpenThermResponseStatus status) 
     String s = "B" + String(request, HEX);
     char data[10];
     s.toCharArray(data, 10);
-    ESP_LOGI(TAG, "Request: %s", data);
+    ESP_LOGD(TAG, "Request: %s", data);
     strcpy(dataBufferSlave[bufferSlaveCount++], data);
 }
 
@@ -194,13 +185,13 @@ void processMasterRequest(unsigned long request, OpenThermResponseStatus status)
     String s = "T" + String(request, HEX);
     char data[10];
     s.toCharArray(data, 10);
-    ESP_LOGI(TAG, "Request: %s", data);
+    ESP_LOGD(TAG, "Request: %s", data);
     strcpy(dataBufferMaster[bufferMasterCount++], data);
 }
 
 
 void processSendRequest(char data[9]) {
-    ESP_LOGI(TAG, "Processing data: %c%c%c%c%c%c%c%c%c",
+    ESP_LOGD(TAG, "Processing data: %c%c%c%c%c%c%c%c%c",
         data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
     // http://otgw.tclcode.com/firmware.html#operation
     // T = received from thermostat
@@ -244,7 +235,7 @@ void processSendRequest(char data[9]) {
 
     // if (msgType == 4 || msgType == 5)
     // { // Filter on READ-ACK (100 = 4) and WRITE-ACK (101 = 5)
-    ESP_LOGI(TAG, "Processing READ-ACK or WRITE-ACK");
+    ESP_LOGD(TAG, "Processing READ-ACK or WRITE-ACK");
     // The second byte (char 3 and 4 if you don't take into account TBRAE) holds the Data-ID
     strncpy(hex, &data[3], 2);          // Copy 2 chars, starting from 3rd character
     hex[2] = '\0';                      // null-terminated string
@@ -257,7 +248,7 @@ void processSendRequest(char data[9]) {
     // 25 = Boiler Water Temperature (f8.8)
     // 28 = Return Water Temperature (f8.8)
     if (dataId == 0) {
-        ESP_LOGI(TAG, "Processing Slave Status");
+        ESP_LOGD(TAG, "Processing Slave Status");
         // bit : description            [clear/0, set/1]
         // 0   : fault indication       [no fault, fault]
         // 1   : CH mode                [CH not active, CH active]
@@ -280,10 +271,10 @@ void processSendRequest(char data[9]) {
 
         // Bitwise compare with 00001000 (8) to get bit number 4. The result is either 8 or 0.
         flame = ((lowbyte & 8) == 8) ? 1 : 0;
-        ESP_LOGI(TAG, "Processing ch_mode %d dhw_mode %d, flame %d", ch_mode, dhw_mode, flame);
+        ESP_LOGD(TAG, "Processing ch_mode %d dhw_mode %d, flame %d", ch_mode, dhw_mode, flame);
     }
     else if (dataId == 14 || dataId == 16 || dataId == 17 || dataId == 24 || dataId == 25 || dataId == 28) {
-        ESP_LOGI(TAG, "Processing regular data values");
+        ESP_LOGD(TAG, "Processing regular data values");
         // These values are f8.8 signed fixed point value : 1 sign bit, 7 integer bit, 8 fractional bits
         // (two’s compliment ie. the LSB of the 16 bit binary number represents 1/256th of a unit).
         strncpy(hex, &data[5], 4); // Copy 4 characters, starting from 5th char of the message (or: take the last 4 chars of the message)
@@ -301,27 +292,27 @@ void processSendRequest(char data[9]) {
         switch (dataId) {
             case 14:
                 dtostrf(tmp, 6, 2, maxRelModLvl);
-                ESP_LOGI(TAG, "Processing maxRelModLvl %s", maxRelModLvl);
+                ESP_LOGD(TAG, "Processing maxRelModLvl %s", maxRelModLvl);
                 break;
             case 16:
                 dtostrf(tmp, 6, 2, roomSetpoint);
-                ESP_LOGI(TAG, "Processing maxRelModLvl %s", roomSetpoint);
+                ESP_LOGD(TAG, "Processing maxRelModLvl %s", roomSetpoint);
                 break;
             case 17:
                 dtostrf(tmp, 6, 2, relModLvl);
-                ESP_LOGI(TAG, "Processing relModLvl %s", relModLvl);
+                ESP_LOGD(TAG, "Processing relModLvl %s", relModLvl);
                 break;
             case 24:
                 dtostrf(tmp, 6, 2, roomTemp);
-                ESP_LOGI(TAG, "Processing roomTemp %s", roomTemp);
+                ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
                 break;
             case 25:
                 dtostrf(tmp, 6, 2, boilerTemp);
-                ESP_LOGI(TAG, "Processing boilerTemp %s", boilerTemp);
+                ESP_LOGD(TAG, "Processing boilerTemp %s", boilerTemp);
                 break;
             case 28:
                 dtostrf(tmp, 6, 2, returnTemp);
-                ESP_LOGI(TAG, "Processing returnTemp %s", returnTemp);
+                ESP_LOGD(TAG, "Processing returnTemp %s", returnTemp);
                 break;
             default:
                 break;
@@ -338,7 +329,7 @@ void processSendRequest(char data[9]) {
         strncpy(hex, &data[7], 2);         // Copy 2 characters, starting from 7th char of the message (low byte)
         hex[2] = '\0';                     // null-terminated string
         minModLvl = strtol(hex, NULL, 16); // Same here, 8 bit signed integer, so just convert from hex to dec.
-        ESP_LOGI(TAG, "Processing maxBoilerCap %d and minModLvl %d", maxBoilerCap, minModLvl);
+        ESP_LOGD(TAG, "Processing maxBoilerCap %d and minModLvl %d", maxBoilerCap, minModLvl);
     }
     // }
 }
@@ -371,8 +362,11 @@ void processSendRequest(char data[9]) {
 // }
 
 void intialize_opentherm() {
+    ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
     mOT.begin(mHandleInterrupt, processMasterRequest);
+    ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
     sOT.begin(sHandleInterrupt, processSlaveRequest);
+    ESP_LOGD(TAG, "exiting initialize_opentherm()");
 }
 
 // Work In-Progress
@@ -388,8 +382,8 @@ esp_err_t store_char_persistent(const char *storage_loc, const char *name, char 
         err = nvs_set_str(char_handle, name, data);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The data was written!\n");
-                ESP_LOGI(TAG, "The data is: %s\n", data);
+                ESP_LOGD(TAG, "The char was written!\n");
+                ESP_LOGD(TAG, "The char is: %s\n", data);
                 break;
             default:
                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
@@ -413,8 +407,8 @@ esp_err_t store_int_persistent(const char *storage_loc, const char *name, uint16
         err = nvs_set_i16(int_handle, name, data);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The data was written!\n");
-                ESP_LOGI(TAG, "The data is: %d\n", data);
+                ESP_LOGD(TAG, "The int was written!\n");
+                ESP_LOGD(TAG, "The int is: %d\n", data);
                 break;
             default:
                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
@@ -439,11 +433,11 @@ uint16_t retrieve_int_persistent(const char *storage_loc, const char *name) {
         err = nvs_get_u16(int_handle, name, &value);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The bearer was read!\n");
-                ESP_LOGI(TAG, "The bearer is: %d\n", value);
+                ESP_LOGD(TAG, "The int was read!\n");
+                ESP_LOGD(TAG, "The int  is: %d\n", value);
                 break;
             case ESP_ERR_NVS_NOT_FOUND:
-                ESP_LOGI(TAG, "The bearer has not been initialized yet!");
+                ESP_LOGE(TAG, "The int was not initialized yet!");
                 break;
             default:
                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
@@ -470,11 +464,11 @@ char *retrieve_char_persistent(const char *storage_loc, const char *name) {
         err = nvs_get_str(char_handle, name, value, &value_size);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The bearer was read!\n");
-                ESP_LOGI(TAG, "The bearer is: %s\n", value);
+                ESP_LOGD(TAG, "The char was read!\n");
+                ESP_LOGD(TAG, "The char is: %s\n", value);
                 break;
             case ESP_ERR_NVS_NOT_FOUND:
-                ESP_LOGI(TAG, "The bearer has not been initialized yet!");
+                ESP_LOGE(TAG, "The char was not initialized yet!");
                 value = "";
                 break;
             default:
@@ -539,17 +533,17 @@ void upload_data() {
             return_temp_str += returnTemp_data[i];
         }
     }
-    ESP_LOGI(TAG, "Temp Data: %s\n", room_temp_str.c_str());
-    ESP_LOGI(TAG, "Boiler Temp: %s\n", boiler_temp_str.c_str());
-    ESP_LOGI(TAG, "Return Temp: %s\n", return_temp_str.c_str());
-    ESP_LOGI(TAG, "CH_MODE: %s\n", ch_mode_str.c_str());
-    ESP_LOGI(TAG, "DHW_MODE: %s\n", dhw_mode_str.c_str());
-    ESP_LOGI(TAG, "flame: %s\n", flame_str.c_str());
-    ESP_LOGI(TAG, "room_set_point: %s\n", room_set_point_str.c_str());
-    ESP_LOGI(TAG, "max_rel: %s\n", max_rel_mod_lvl_str.c_str());
-    ESP_LOGI(TAG, "min_mod: %s\n", min_mod_lvl_str.c_str());
-    ESP_LOGI(TAG, "rel_mod: %s\n", rel_mod_lvl_str.c_str());
-    ESP_LOGI(TAG, "boiler cap: %s\n", max_boiler_cap_str.c_str());
+    ESP_LOGD(TAG, "Temp Data: %s\n", room_temp_str.c_str());
+    ESP_LOGD(TAG, "Boiler Temp: %s\n", boiler_temp_str.c_str());
+    ESP_LOGD(TAG, "Return Temp: %s\n", return_temp_str.c_str());
+    ESP_LOGD(TAG, "CH_MODE: %s\n", ch_mode_str.c_str());
+    ESP_LOGD(TAG, "DHW_MODE: %s\n", dhw_mode_str.c_str());
+    ESP_LOGD(TAG, "flame: %s\n", flame_str.c_str());
+    ESP_LOGD(TAG, "room_set_point: %s\n", room_set_point_str.c_str());
+    ESP_LOGD(TAG, "max_rel: %s\n", max_rel_mod_lvl_str.c_str());
+    ESP_LOGD(TAG, "min_mod: %s\n", min_mod_lvl_str.c_str());
+    ESP_LOGD(TAG, "rel_mod: %s\n", rel_mod_lvl_str.c_str());
+    ESP_LOGD(TAG, "boiler cap: %s\n", max_boiler_cap_str.c_str());
 }
 
 char *get_property_string_char(char *prop_name, uint32_t time, char *value) {
@@ -593,7 +587,7 @@ char *get_boiler_measurements_data(uint32_t time) {
     int msgSize = variable_sprintf_size(msg_multiple_string, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
     snprintf(msg, msgSize, msg_multiple_string, time, combined_properties.c_str());
-    ESP_LOGI(TAG, "Data: %s", msg);
+    ESP_LOGD(TAG, "Data: %s", msg);
 
     // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
     // memcpy(&dhw_mode_data[regular_measurement_count], &dhw_mode, sizeof(dhw_mode));                    // Domestic hot water mode (ON/OFF)
@@ -627,7 +621,7 @@ char *get_regular_measurements_data(uint32_t time) {
     int msgSize = variable_sprintf_size(msg_multiple_string, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
     snprintf(msg, msgSize, msg_multiple_string, time, combined_properties.c_str());
-    ESP_LOGI(TAG, "Data: %s", msg);
+    ESP_LOGD(TAG, "Data: %s", msg);
 
 
     // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
@@ -644,72 +638,37 @@ char *get_regular_measurements_data(uint32_t time) {
 
 
 void setup() {
-    initialize_nvs();
-    initialize();
-    /* Initialize TCP/IP */
-    ESP_ERROR_CHECK(esp_netif_init());
+    twomes_device_provisioning(DEVICE_TYPE_NAME);
 
-    wifi_prov_mgr_config_t config = initialize_provisioning();
+    ESP_LOGD(TAG, "Starting heartbeat task");
+    xTaskCreatePinnedToCore(&heartbeat_task, "heartbeat_task", 4096, NULL, 1, NULL, 1);
 
-    //Make sure to have this here otherwise the device names won't match because
-    //of config changes made by the above function call.
-    prepare_device(DEVICE_TYPE_NAME);
-    //Starts provisioning if not provisioned, otherwise skips provisioning.
-    //If set to false it will not autoconnect after provisioning.
-    //If set to true it will autonnect.
-    start_provisioning(config, true);
-    //Initialize time with timezone UTC; building timezone is stored in central database
-    char *tz;
-    tz = "UTC";
-    initialize_time(tz);
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
+    
+    ESP_LOGD(TAG, "Starting timesync task");
+    xTaskCreatePinnedToCore(&timesync_task, "timesync_task", 4096, NULL, 1, NULL, 1);
 
-    //Gets time as epoch time.
-    ESP_LOGI(TAG, "Getting time!");
-    uint32_t now = time(NULL);
-    ESP_LOGI(TAG, "Time is: %d", now);
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
 
-    char *bearer = get_bearer();
-    char *device_name;
-    device_name = (char *)malloc(DEVICE_NAME_SIZE);
+    #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
+    ESP_LOGD(TAG, "Starting presence detection");
+    start_presence_detection();
+    #endif
 
-    get_device_service_name(device_name, DEVICE_NAME_SIZE);
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
 
-    if (strlen(bearer) > 1) {
-        ESP_LOGI(TAG, "Bearer read: %s", bearer);
-    }
-    else if (strcmp(bearer, "") == 0) {
-        ESP_LOGI(TAG, "Bearer not found, activating device!");
-        activate_device(device_activation_url, device_name, root_cert);
-        bearer = get_bearer();
-    }
-    else if (!bearer) {
-        ESP_LOGE(TAG, "Something went wrong whilst reading the bearer!");
-    }
+    ESP_LOGD(TAG, "Generic Setup complete");
 
-    // Example Message Check generic_esp_32.c upload_hearbeat function to see a real example of this being filled.
-    // char *msg_plain = "{\"upload_time\": \"%d\",\"property_measurements\":[    {"
-    //                   "\"property_name\": %s,"
-    //                   "\"measurements\": ["
-    //                    "{ \"timestamp\":\"%d\","
-    //                    "\"value\":\"1\"}"
-    //                   "]}]}";
-    /* Start main application now */
-    while (1) {
-        //Wait to make sure Wi-Fi is enabled.
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-        //Upload heartbeat
-        upload_heartbeat(variable_interval_upload_url, root_cert, bearer);
-        //Wait to make sure uploading is finished.
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-        //Disconnect WiFi
-        //Wait HEARTBEAT_UPLOAD_INTERVAL(currently 1 hour)
-        vTaskDelay(HEARTBEAT_UPLOAD_INTERVAL / portTICK_PERIOD_MS);
-    }
+    ESP_LOGD(TAG, "calling initialize_opentherm()");
+    intialize_opentherm();
+    ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
+    initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
 }
 
 void loop() {
-    intialize_opentherm();
-    initialize_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
     char *msg_multiple_string = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
         "%s"
         "]}";
@@ -719,11 +678,11 @@ void loop() {
         mOT.process();
         if (bufferSlaveCount != 0) {
             processSendRequest(dataBufferSlave[--bufferSlaveCount]);
-            ESP_LOGI(TAG, "Slave Count: %d", bufferSlaveCount);
+            ESP_LOGD(TAG, "Slave Count: %d", bufferSlaveCount);
         }
         if (bufferMasterCount != 0) {
             processSendRequest(dataBufferMaster[--bufferMasterCount]);
-            ESP_LOGI(TAG, "Master Count: %d", bufferMasterCount);
+            ESP_LOGD(TAG, "Master Count: %d", bufferMasterCount);
         }
         if (upload_timer_count >= OPENTHERM_UPLOAD_INTERVAL) {
             // ESP_LOGE(TAG, "Uploading all buffered data!");
@@ -734,41 +693,41 @@ void loop() {
         }
         //boilerSupplyTemp & boilerReturnTemp timer
         if (boiler_timer_count >= BOILER_MEASUREMENT_INTERVAL) {
-            ESP_LOGE(TAG, "Measuring and uploading boilerSupplyTemp and boilerReturnTemp!");
-            uint32_t now = time(NULL);
-            char *msg = get_boiler_measurements_data(now);
-            char *bearer = get_bearer();
-            post_https(variable_interval_upload_url, msg, root_cert, bearer, NULL, 0);
+            ESP_LOGD(TAG, "Measuring and uploading boilerSupplyTemp and boilerReturnTemp");
+            char *msg = get_boiler_measurements_data(time(NULL));
+            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+            free(msg);
+            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
             // strcpy(boilerTemp_data[boiler_measurement_count], boilerTemp);
             // strcpy(returnTemp_data[boiler_measurement_count], returnTemp);
             // boiler_measurement_count++;
-            ESP_LOGI(TAG, "Free Heap: %d", esp_get_free_heap_size());
             boiler_timer_count = 0;
         }
         if (room_temp_timer_count >= ROOM_TEMP_MEASUREMENT_INTERVAL) {
-            uint32_t now = time(NULL);
-            ESP_LOGE(TAG, "Measuring and uploading room temp!");
-            char *bearer = get_bearer();
+            ESP_LOGD(TAG, "Measuring and uploading room temp");
             //Get size of the message after inputting variables.
-            char *room_temp_property = get_property_string_char("roomTemp", now, roomTemp);
-            int msgSize = variable_sprintf_size(msg_multiple_string, 2, now, room_temp_property);
+            char *room_temp_property = get_property_string_char("roomTemp", time(NULL), roomTemp);
+            int msgSize = variable_sprintf_size(msg_multiple_string, 2, time(NULL), room_temp_property);
             //Allocating enough memory so inputting the variables into the string doesn't overflow
             char *msg = (char *)malloc(msgSize);
             //Inputting variables into the plain json string from above(msgPlain).
-            snprintf(msg, msgSize, msg_multiple_string, now, room_temp_property);
+            snprintf(msg, msgSize, msg_multiple_string, time(NULL), room_temp_property);
             //Posting data over HTTPS, using url, msg and bearer token.
-            ESP_LOGI(TAG, "Data: %s", msg);
-            post_https(variable_interval_upload_url, msg, root_cert, bearer, NULL, 0);
-            // strcpy(roomTemp_data[room_temp_count++], roomTemp);
-            ESP_LOGI(TAG, "Free Heap: %d", esp_get_free_heap_size());
+            ESP_LOGD(TAG, "Data: %s", msg);
+            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+            free(msg);
+            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
             room_temp_timer_count = 0;
         }
         if (regular_timer_count >= REGULAR_MEASUREMENT_INTERVAL) {
-            ESP_LOGE(TAG, "Measuring and uploading regular measurements!");
-            uint32_t now = time(NULL);
-            char *msg = get_regular_measurements_data(now);
-            char *bearer = get_bearer();
-            post_https(variable_interval_upload_url, msg, root_cert, bearer, NULL, 0);
+            ESP_LOGE(TAG, "Measuring and uploading regular measurements");
+            char *msg = get_regular_measurements_data(time(NULL));
+            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+            free(msg);
+            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
             // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
             // memcpy(&dhw_mode_data[regular_measurement_count], &dhw_mode, sizeof(dhw_mode));                    // Domestic hot water mode (ON/OFF)
             // memcpy(&flame_data[regular_measurement_count], &flame, sizeof(flame));                             // Burner status (ON/OFF)
@@ -778,16 +737,14 @@ void loop() {
             // strcpy(relModLvl_data[regular_measurement_count], relModLvl);                                      // Relative modulation level
             // memcpy(&maxBoilerCapStorage_data[regular_measurement_count], &maxBoilerCap, sizeof(maxBoilerCap)); // Maximum boiler capacity
             // regular_measurement_count++;
-            ESP_LOGI(TAG, "Free Heap: %d", esp_get_free_heap_size());
-
             regular_timer_count = 0;
         }
-        // ESP_LOGI(TAG, "Upload Timer Count: %d", upload_timer_count);
-        // ESP_LOGI(TAG, "Boiler Timer Count: %d", boiler_timer_count);
-        // ESP_LOGI(TAG, "Room Temp Timer Count: %d", room_temp_timer_count);
-        // ESP_LOGI(TAG, "Regular Timer Count: %d", regular_timer_count);
+        // ESP_LOGD(TAG, "Upload Timer Count: %d", upload_timer_count);
+        // ESP_LOGD(TAG, "Boiler Timer Count: %d", boiler_timer_count);
+        // ESP_LOGD(TAG, "Room Temp Timer Count: %d", room_temp_timer_count);
+        // ESP_LOGD(TAG, "Regular Timer Count: %d", regular_timer_count);
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        // ESP_LOGI(TAG, "I'm looping in the opentherm loop!");
+        // ESP_LOGD(TAG, "I'm looping in the opentherm loop!");
         // vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }

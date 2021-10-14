@@ -74,7 +74,7 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 } //gpio_isr_handler
 
-//Function to initialise the buttons and LEDs on the gateway, with interrupts on the buttons
+//Function to initialise the buttons and LEDs, with interrupts on the buttons
 void initGPIO() {
     gpio_config_t io_conf;
     //CONFIGURE OUTPUTS:
@@ -100,7 +100,7 @@ void initGPIO() {
 */
 void buttonPressDuration(void *args) {
     uint32_t io_num;
-    ESP_LOGD(TAG, "Button Press Duration is Here!");
+    ESP_LOGD(TAG, "Wi-Fi reset button event handler started");
     while (1) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             uint8_t seconds = 0;
@@ -108,11 +108,11 @@ void buttonPressDuration(void *args) {
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 seconds++;
                 if (seconds == 9) {
-                    ESP_LOGD("ISR", "Button held for over 10 seconds\n");
+                    ESP_LOGD("ISR", "Wi-Fi reset button held for over 10 seconds\n");
                     char blinkArgs[2] = { 5, LED_ERROR };
                     xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
                     //Long press on WIFI_RESET_BUTTON(BOOT on the esp32) is for clearing Wi-Fi provisioning memory:
-                    ESP_LOGD("ISR", "Resetting Provisioning and Restarting Device!");
+                    ESP_LOGD("ISR", "Resetting Wi-Fi provisioning and restarting device!");
                     esp_wifi_restore();
                     vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
                     esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
@@ -153,12 +153,14 @@ void initialize_generic_firmware() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_event_group = xEventGroupCreate();
 #ifndef CONFIG_TWOMES_CUSTOM_GPIO
+/* TODO: figure out why this code is not disabled when we #define CONFIG_TWOMES_CUSTOM_GPIO in main.cpp
     initGPIO();
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 2048, NULL, 10, NULL, 1);
     gpio_install_isr_service(0);
     gpio_isr_handler_add(WIFI_RESET_BUTTON, gpio_isr_handler, (void *)WIFI_RESET_BUTTON);
+    */
 #endif
 }
 

@@ -30,8 +30,17 @@
 #endif
 
 #define VERSION "V2.5.0"
+
+//TODO: check if #defines from main.cpp are active here
+#ifndef WIFI_RESET_BUTTON
 #define WIFI_RESET_BUTTON   GPIO_NUM_0
+#endif
+
+//TODO: check if #defines from main.cpp are active here
+#ifndef LED_ERROR
 #define LED_ERROR   GPIO_NUM_19
+#endif 
+
 #define MAX_RESPONSE_LENGTH 100
 
 #define SSID_PREFIX "TWOMES-"
@@ -90,10 +99,11 @@ void sntp_sync_time(struct timeval *tv);
 #ifndef CONFIG_TWOMES_CUSTOM_GPIO
 #define OUTPUT_BITMASK ((1ULL<<LED_ERROR))
 #define INPUT_BITMASK ((1ULL << WIFI_RESET_BUTTON))
-
 void initGPIO();
 void buttonPressDuration(void *args);
 #endif
+
+
 void blink(void *args);
 char *get_types(char *stringf, int count);
 int variable_sprintf_size(char *string, int count, ...);

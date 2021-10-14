@@ -1,6 +1,18 @@
 #include "Arduino.h"
 #include "OpenTherm.h"
 
+#define CONFIG_TWOMES_CUSTOM_GPIO
+
+#define WIFI_RESET_BUTTON   GPIO_NUM_16
+#define LED_ERROR           GPIO_NUM_22
+#define MASTER_IN_PIN       GPIO_NUM_19
+#define MASTER_OUT_PIN      GPIO_NUM_26 //24 does not exist!
+#define SLAVE_IN_PIN        GPIO_NUM_21
+#define SLAVE_OUT_PIN       GPIO_NUM_23
+
+#define INPUT_BITMASK       ( (1ULL << WIFI_RESET_BUTTON) | (1ULL << MASTER_IN_PIN) | (1ULL << SLAVE_IN_PIN) )
+#define OUTPUT_BITMASK      ( (1ULL << LED_ERROR) | (1ULL << SLAVE_OUT_PIN) | (1ULL << MASTER_OUT_PIN) )
+
 extern "C"
 {
 #include <generic_esp_32.h>
@@ -16,6 +28,12 @@ extern "C"
 
 #define DEVICE_TYPE_NAME "OpenTherm-Monitor"
 static const char *TAG = "Twomes ESP32 Arduiono framework based OpenTherm Monitor";
+
+const int mInPin = MASTER_IN_PIN;  
+const int mOutPin = MASTER_OUT_PIN; 
+
+const int sInPin = SLAVE_IN_PIN;
+const int sOutPin = SLAVE_OUT_PIN; 
 
 #define DEBUG
 #define LED_BUILTIN 32
@@ -50,12 +68,6 @@ char maxRelModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Ma
 int minModLvl_data[REGULAR_MEASUREMENT_MAX];                               // Minimum modulation level
 char relModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Relative modulation level
 int maxBoilerCapStorage_data[REGULAR_MEASUREMENT_MAX];                     // Maximum boiler capacity
-
-const int mInPin = 21;  //for Arduino, 4 for ESP8266 (D2), 21 for ESP32
-const int mOutPin = 22; //for Arduino, 5 for ESP8266 (D1), 22 for ESP32
-
-const int sInPin = 19;  //for Arduino, 12 for ESP8266 (D6), 19 for ESP32
-const int sOutPin = 23; //for Arduino, 13 for ESP8266 (D7), 23 for ESP32
 
 OpenTherm mOT(mInPin, mOutPin, true);
 OpenTherm sOT(sInPin, sOutPin, true);
@@ -361,7 +373,30 @@ void processSendRequest(char data[9]) {
 //     }
 // }
 
+//Function to initialise the buttons and LEDs, with interrupts on the buttons
+void initGPIO_OpenTherm() {
+    gpio_config_t io_conf;
+    //CONFIGURE OUTPUTS:
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = OUTPUT_BITMASK;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+    //CONFIGURE INPUTS:
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = INPUT_BITMASK;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    gpio_config(&io_conf);
+}
+
+
 void intialize_opentherm() {
+    ESP_LOGD(TAG, "calling initGPIO_OpenTherm();");
+    initGPIO_OpenTherm();
+    //TODO: init handler for WIFI_RESET_BUTTON press
     ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
     mOT.begin(mHandleInterrupt, processMasterRequest);
     ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
@@ -636,8 +671,10 @@ char *get_regular_measurements_data(uint32_t time) {
 }
 
 
-
 void setup() {
+    ESP_LOGD(TAG, "calling initialize_opentherm()");
+    intialize_opentherm();
+
     twomes_device_provisioning(DEVICE_TYPE_NAME);
 
     ESP_LOGD(TAG, "Starting heartbeat task");
@@ -662,8 +699,6 @@ void setup() {
 
     ESP_LOGD(TAG, "Generic Setup complete");
 
-    ESP_LOGD(TAG, "calling initialize_opentherm()");
-    intialize_opentherm();
     ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
     initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
 }

@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include "opentherm.h"
 
-#define CONFIG_TWOMES_CUSTOM_GPIO
-
 #define WIFI_RESET_BUTTON   GPIO_NUM_16
 #define LED_ERROR           GPIO_NUM_22
 #define MASTER_IN_PIN       GPIO_NUM_19
@@ -53,6 +51,7 @@ int regular_measurement_count = 0;
 
 #define TIMER_DIVIDER 80
 
+// in-memory buffers for interpreted values
 int ch_mode_data[REGULAR_MEASUREMENT_MAX];                                 // Central heating mode (ON/OFF)
 int dhw_mode_data[REGULAR_MEASUREMENT_MAX];                                // Domestic hot water mode (ON/OFF)
 int flame_data[REGULAR_MEASUREMENT_MAX];                                   // Burner status (ON/OFF)
@@ -80,17 +79,17 @@ int minModLvl = 0;              // Minimum modulation level
 char relModLvl[] = "  0.00";    // Relative modulation level
 int maxBoilerCap = 0;           // Maximum boiler capacity
 
-const char *ch_mode_name = "chmode";
-const char *dhw_mode_name = "dhwmode";
-const char *flame_name = "flame";
-const char *room_setpoint_name = "roomSetpoint";
-const char *room_temp_name = "roomTemp";
-const char *boiler_temp_name = "boilerTemp";
-const char *return_temp_name = "returnTemp";
-const char *max_rel_mod_lvl_name = "maxRelModLvl";
-const char *min_mod_lvl_name = "minModLvl";
-const char *rel_mod_lvl_name = "relModLvl";
-const char *max_boiler_cap_name = "maxBoilerCap";
+// const char *ch_mode_name = "chmode";
+// const char *dhw_mode_name = "dhwmode";
+// const char *flame_name = "flame";
+// const char *room_setpoint_name = "roomSetpoint";
+// const char *room_temp_name = "roomTemp";
+// const char *boiler_temp_name = "boilerTemp";
+// const char *return_temp_name = "returnTemp";
+// const char *max_rel_mod_lvl_name = "maxRelModLvl";
+// const char *min_mod_lvl_name = "minModLvl";
+// const char *rel_mod_lvl_name = "relModLvl";
+// const char *max_boiler_cap_name = "maxBoilerCap";
 
 char hex[5];     // Max 4 hex chars (two bytes) + null-terminator
 int pointer = 0; // Used to keep track of position of received character
@@ -108,7 +107,7 @@ int upload_timer_count = 0;
 
 int buffered_cycles_count = 0;
 
-char *storage_template = (char *)"OpenTherm-%d";
+// char *storage_template = (char *)"OpenTherm-%d";
 
 typedef struct {
     int timer_group;
@@ -117,11 +116,11 @@ typedef struct {
     bool auto_reload;
 } seconds_timer_info_t;
 
-void ICACHE_RAM_ATTR mHandleInterrupt() {
+void ICACHE_RAM_ATTR mHandleInterrupt(void*) {
     mOT.handleInterrupt();
 }
 
-void ICACHE_RAM_ATTR sHandleInterrupt() {
+void ICACHE_RAM_ATTR sHandleInterrupt(void*) {
     sOT.handleInterrupt();
 }
 
@@ -184,18 +183,16 @@ void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool aut
 void processSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
     ESP_LOGD(TAG, "Request from boiler: %lu", request);
-
     char data[10];
-    sprintf(data, "B%h", request);
-    //s.toCharArray(data, 10);
+    sprintf(data, "B%X", (unsigned int) request); //TODO: check if typecasging to unsigned int is allowed here
     strcpy(dataBufferSlave[bufferSlaveCount++], data);
 }
 
 void processMasterRequest(unsigned long request, OpenThermResponseStatus status) {
-    std::string s = "T" + std::string(request, HEX);
+    //TODO: ESP_LOGD cannot be used from an interrupt
+    ESP_LOGD(TAG, "Request from thermostat: %lu", request);
     char data[10];
-    //s.toCharArray(data, 10);
-    ESP_LOGD(TAG, "Request: %s", data);
+    sprintf(data, "T%X", (unsigned int) request); //TODO: check if typecasging to unsigned int is allowed here
     strcpy(dataBufferMaster[bufferMasterCount++], data);
 }
 
@@ -301,27 +298,27 @@ void processSendRequest(char data[9]) {
         // Format the floating point value to a string with 6 characters using 2 decimals
         switch (dataId) {
             case 14:
-                dtostrf(tmp, 6, 2, maxRelModLvl);
+                sprintf(maxRelModLvl, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing maxRelModLvl %s", maxRelModLvl);
                 break;
             case 16:
-                dtostrf(tmp, 6, 2, roomSetpoint);
-                ESP_LOGD(TAG, "Processing maxRelModLvl %s", roomSetpoint);
+                sprintf(roomSetpoint, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                ESP_LOGD(TAG, "Processing roomSetpoint %s", roomSetpoint);
                 break;
             case 17:
-                dtostrf(tmp, 6, 2, relModLvl);
+                sprintf(relModLvl, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing relModLvl %s", relModLvl);
                 break;
             case 24:
-                dtostrf(tmp, 6, 2, roomTemp);
+                sprintf(roomTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
                 break;
             case 25:
-                dtostrf(tmp, 6, 2, boilerTemp);
+                sprintf(boilerTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing boilerTemp %s", boilerTemp);
                 break;
             case 28:
-                dtostrf(tmp, 6, 2, returnTemp);
+                sprintf(returnTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing returnTemp %s", returnTemp);
                 break;
             default:
@@ -403,115 +400,115 @@ void intialize_opentherm() {
 }
 
 // Work In-Progress
-esp_err_t store_char_persistent(const char *storage_loc, const char *name, char *data) {
-    esp_err_t err;
-    nvs_handle_t char_handle;
-    err = nvs_open(storage_loc, NVS_READWRITE, &char_handle);
-    if (err) {
-        ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
-    }
-    else {
-        ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        err = nvs_set_str(char_handle, name, data);
-        switch (err) {
-            case ESP_OK:
-                ESP_LOGD(TAG, "The char was written!\n");
-                ESP_LOGD(TAG, "The char is: %s\n", data);
-                break;
-            default:
-                ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
-        }
-        err = nvs_commit(char_handle);
-        nvs_close(char_handle);
-    }
-    return err;
-}
+// esp_err_t store_char_persistent(const char *storage_loc, const char *name, char *data) {
+//     esp_err_t err;
+//     nvs_handle_t char_handle;
+//     err = nvs_open(storage_loc, NVS_READWRITE, &char_handle);
+//     if (err) {
+//         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+//     }
+//     else {
+//         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
+//         err = nvs_set_str(char_handle, name, data);
+//         switch (err) {
+//             case ESP_OK:
+//                 ESP_LOGD(TAG, "The char was written!\n");
+//                 ESP_LOGD(TAG, "The char is: %s\n", data);
+//                 break;
+//             default:
+//                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
+//         }
+//         err = nvs_commit(char_handle);
+//         nvs_close(char_handle);
+//     }
+//     return err;
+// }
 
 // Work In-Progress
-esp_err_t store_int_persistent(const char *storage_loc, const char *name, uint16_t data) {
-    esp_err_t err;
-    nvs_handle_t int_handle;
-    err = nvs_open(storage_loc, NVS_READWRITE, &int_handle);
-    if (err) {
-        ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
-    }
-    else {
-        ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        err = nvs_set_i16(int_handle, name, data);
-        switch (err) {
-            case ESP_OK:
-                ESP_LOGD(TAG, "The int was written!\n");
-                ESP_LOGD(TAG, "The int is: %d\n", data);
-                break;
-            default:
-                ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
-        }
-        err = nvs_commit(int_handle);
-        nvs_close(int_handle);
-    }
-    return err;
-}
+// esp_err_t store_int_persistent(const char *storage_loc, const char *name, uint16_t data) {
+//     esp_err_t err;
+//     nvs_handle_t int_handle;
+//     err = nvs_open(storage_loc, NVS_READWRITE, &int_handle);
+//     if (err) {
+//         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+//     }
+//     else {
+//         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
+//         err = nvs_set_i16(int_handle, name, data);
+//         switch (err) {
+//             case ESP_OK:
+//                 ESP_LOGD(TAG, "The int was written!\n");
+//                 ESP_LOGD(TAG, "The int is: %d\n", data);
+//                 break;
+//             default:
+//                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
+//         }
+//         err = nvs_commit(int_handle);
+//         nvs_close(int_handle);
+//     }
+//     return err;
+// }
+
+// // Work In-Progress
+// uint16_t retrieve_int_persistent(const char *storage_loc, const char *name) {
+//     esp_err_t err;
+//     uint16_t value = 0;
+//     nvs_handle_t int_handle;
+//     err = nvs_open("twomes_storage", NVS_READONLY, &int_handle);
+//     if (err) {
+//         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+//     }
+//     else {
+//         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
+//         err = nvs_get_u16(int_handle, name, &value);
+//         switch (err) {
+//             case ESP_OK:
+//                 ESP_LOGD(TAG, "The int was read!\n");
+//                 ESP_LOGD(TAG, "The int  is: %d\n", value);
+//                 break;
+//             case ESP_ERR_NVS_NOT_FOUND:
+//                 ESP_LOGE(TAG, "The int was not initialized yet!");
+//                 break;
+//             default:
+//                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
+//         }
+//         nvs_close(int_handle);
+//     }
+//     return value;
+// }
 
 // Work In-Progress
-uint16_t retrieve_int_persistent(const char *storage_loc, const char *name) {
-    esp_err_t err;
-    uint16_t value = 0;
-    nvs_handle_t int_handle;
-    err = nvs_open("twomes_storage", NVS_READONLY, &int_handle);
-    if (err) {
-        ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
-    }
-    else {
-        ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        err = nvs_get_u16(int_handle, name, &value);
-        switch (err) {
-            case ESP_OK:
-                ESP_LOGD(TAG, "The int was read!\n");
-                ESP_LOGD(TAG, "The int  is: %d\n", value);
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                ESP_LOGE(TAG, "The int was not initialized yet!");
-                break;
-            default:
-                ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
-        }
-        nvs_close(int_handle);
-    }
-    return value;
-}
-
-// Work In-Progress
-char *retrieve_char_persistent(const char *storage_loc, const char *name) {
-    esp_err_t err;
-    char *value = NULL;
-    nvs_handle_t char_handle;
-    err = nvs_open("twomes_storage", NVS_READONLY, &char_handle);
-    if (err) {
-        ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
-    }
-    else {
-        ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        size_t value_size;
-        nvs_get_str(char_handle, name, NULL, &value_size);
-        value = (char *)malloc(value_size);
-        err = nvs_get_str(char_handle, name, value, &value_size);
-        switch (err) {
-            case ESP_OK:
-                ESP_LOGD(TAG, "The char was read!\n");
-                ESP_LOGD(TAG, "The char is: %s\n", value);
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                ESP_LOGE(TAG, "The char was not initialized yet!");
-                value = "";
-                break;
-            default:
-                value = NULL;
-                ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
-        }
-        nvs_close(char_handle);
-    }
-    return value;
-}
+// char *retrieve_char_persistent(const char *storage_loc, const char *name) {
+//     esp_err_t err;
+//     char *value = NULL;
+//     nvs_handle_t char_handle;
+//     err = nvs_open("twomes_storage", NVS_READONLY, &char_handle);
+//     if (err) {
+//         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+//     }
+//     else {
+//         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
+//         size_t value_size;
+//         nvs_get_str(char_handle, name, NULL, &value_size);
+//         value = (char *)malloc(value_size);
+//         err = nvs_get_str(char_handle, name, value, &value_size);
+//         switch (err) {
+//             case ESP_OK:
+//                 ESP_LOGD(TAG, "The char was read!\n");
+//                 ESP_LOGD(TAG, "The char is: %s\n", value);
+//                 break;
+//             case ESP_ERR_NVS_NOT_FOUND:
+//                 ESP_LOGE(TAG, "The char was not initialized yet!");
+//                 value = "";
+//                 break;
+//             default:
+//                 value = NULL;
+//                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
+//         }
+//         nvs_close(char_handle);
+//     }
+//     return value;
+// }
 
 //WIP Will be radically different later
 void upload_data() {
@@ -528,25 +525,23 @@ void upload_data() {
     std::string max_boiler_cap_str("");
     for (int i = 0; i < regular_measurement_count; i++) {
         if (i) {
-            ch_mode_str += std::string(",") + std::string(ch_mode_data[i]);
-            dhw_mode_str += std::string(",") + std::string(dhw_mode_data[i]);
-            flame_str += std::string(",") + std::string(flame_data[i]);
-            room_set_point_str += std::string(",") + std::string(roomSetpoint_data[i]);
-            max_rel_mod_lvl_str += std::string(",") + std::string(maxRelModLvl_data[i]);
-            min_mod_lvl_str += std::string(",") + std::string(minModLvl_data[i]);
-            rel_mod_lvl_str += std::string(",") + std::string(relModLvl_data[i]);
-            max_boiler_cap_str += std::string(",") + std::string(maxBoilerCapStorage_data[i]);
+            ch_mode_str.append(",");
+            dhw_mode_str.append(",");
+            flame_str.append(",");
+            room_set_point_str.append(",");
+            max_rel_mod_lvl_str.append(",");
+            min_mod_lvl_str.append(",");
+            min_mod_lvl_str.append(",");
+            max_boiler_cap_str.append(",");
         }
-        else {
-            ch_mode_str += std::string(ch_mode_data[i]);
-            dhw_mode_str += std::string(dhw_mode_data[i]);
-            flame_str += std::string(flame_data[i]);
-            room_set_point_str += roomSetpoint_data[i];
-            max_rel_mod_lvl_str += maxRelModLvl_data[i];
-            min_mod_lvl_str += std::string(minModLvl_data[i]);
-            rel_mod_lvl_str += relModLvl_data[i];
-            max_boiler_cap_str += std::string(maxBoilerCapStorage_data[i]);
-        }
+        ch_mode_str.append(std::to_string(ch_mode_data[i]));
+        dhw_mode_str.append(std::to_string(dhw_mode_data[i]));
+        flame_str.append(std::to_string(flame_data[i]));
+        room_set_point_str.append(roomSetpoint_data[i]);
+        max_rel_mod_lvl_str.append(maxRelModLvl_data[i]);
+        min_mod_lvl_str.append(std::to_string(minModLvl_data[i]));
+        min_mod_lvl_str.append(relModLvl_data[i]);
+        max_boiler_cap_str.append(std::to_string(maxBoilerCapStorage_data[i]));
     }
     for (int i = 0; i < room_temp_count; i++) {
         if (i) {

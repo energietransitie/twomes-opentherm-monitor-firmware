@@ -16,38 +16,9 @@ OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : status(OpenThermStat
 															processResponseCallback(NULL)
 {
 }
-static xQueueHandle gpio_evt_queue;
 
-// //Gpio ISR handler:
-// void IRAM_ATTR gpio_isr_handler(void *arg)
-// {
-// 	ESP_LOGI("Interrupt OpenTherm", "Got Here in Interrupt!");
-//     uint32_t gpio_num = (uint32_t)arg;
-//     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-// } //gpio_isr_handler
-
-void OpenTherm::begin(void (*handleInterruptCallback)(void*), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus), xQueueHandle queue)
+void OpenTherm::begin(void (*handleInterruptCallback)(void*), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus))
 {
-	gpio_evt_queue = queue;
-	gpio_config_t io_conf;
-#define OUTPUT_BITMASK ((1ULL << outPin))
-#define INPUT_BITMASK ((1ULL << inPin))
-	// pinMode(inPin, INPUT);
-	//CONFIGURE INPUTS:
-	io_conf.intr_type = GPIO_INTR_ANYEDGE;
-	io_conf.mode = GPIO_MODE_INPUT;
-	io_conf.pin_bit_mask = INPUT_BITMASK;
-	io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-	io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-	gpio_config(&io_conf);
-	//CONFIGURE OUTPUTS:
-	io_conf.intr_type = GPIO_INTR_DISABLE;
-	io_conf.mode = GPIO_MODE_OUTPUT;
-	io_conf.pin_bit_mask = OUTPUT_BITMASK;
-	io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-	io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-	gpio_config(&io_conf);
-	// pinMode(outPin, OUTPUT);
 	if (handleInterruptCallback != NULL)
 	{
 		this->handleInterruptCallback = handleInterruptCallback;
@@ -63,7 +34,7 @@ void OpenTherm::begin(void (*handleInterruptCallback)(void*), void (*processResp
 
 void OpenTherm::begin(void (*handleInterruptCallback)(void*))
 {
-	begin(handleInterruptCallback, NULL, NULL);
+	begin(handleInterruptCallback, NULL);
 }
 
 bool ICACHE_RAM_ATTR OpenTherm::isReady()

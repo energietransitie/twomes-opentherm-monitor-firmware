@@ -42,8 +42,6 @@
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 #define MAX_HTTP_RECV_BUFFER 512
 
-#define LONG_BUTTON_PRESS_DURATION 10 // seconds
-
 #define HTTPS_PRE_WAIT_MS (100) // milliseconds
 #define HTTPS_RETRY_WAIT_MS (2 * 1000) // milliseconds ( 2 s * 1000 ms/s)  
 #define HTTPS_POST_WAIT_MS (100) // milliseconds

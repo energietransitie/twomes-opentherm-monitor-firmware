@@ -29,17 +29,10 @@
 #include "presence_detection.h"
 #endif
 
-#define VERSION "V2.5.0"
-
-//TODO: check if #defines from main.cpp are active here
-#ifndef WIFI_RESET_BUTTON
-#define WIFI_RESET_BUTTON   GPIO_NUM_0
-#endif
-
-//TODO: check if #defines from main.cpp are active here
-#ifndef LED_ERROR
-#define LED_ERROR   GPIO_NUM_19
-#endif 
+#define VERSION "V2.6.0"
+#define BOOT   GPIO_NUM_0
+#define RED_LED_ERROR   GPIO_NUM_19
+#define LONG_BUTTON_PRESS_DURATION 19 // (10 s * 2 halfseconds - 1); this constant specifies the number of half seconds minus one to wait
 
 #define MAX_RESPONSE_LENGTH 100
 
@@ -78,9 +71,18 @@
 
 xSemaphoreHandle wireless_802_11_mutex;
 
+#ifdef CONFIG_TWOMES_TEST_SERVER
 #define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"
 #define TWOMES_SERVER "https://api.tst.energietransitiewindesheim.nl"
+#endif
+
+#ifdef CONFIG_TWOMES_PRODUCTION_SERVER
+#define TWOMES_SERVER_HOSTNAME "api.energietransitiewindesheim.nl"
+#define TWOMES_SERVER "https://api.energietransitiewindesheim.nl"
+#endif
+
 #define VARIABLE_UPLOAD_ENDPOINT "/device/measurements/variable-interval"
+#define FIXED_INTERVAL_UPLOAD_ENDPOINT "/device/measurements/fixed-interval"
 #define DEVICE_ACTIVATION_ENDPOINT "/device/activate"
 
 #ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE
@@ -97,13 +99,12 @@ void sntp_sync_time(struct timeval *tv);
 
 
 #ifndef CONFIG_TWOMES_CUSTOM_GPIO
-#define OUTPUT_BITMASK ((1ULL<<LED_ERROR))
-#define INPUT_BITMASK ((1ULL << WIFI_RESET_BUTTON))
+#define OUTPUT_BITMASK ((1ULL<<RED_LED_ERROR))
+#define INPUT_BITMASK ((1ULL << BOOT))
+
 void initGPIO();
-void buttonPressDuration(void *args);
+void buttonPressHandlerGeneric(void *args);
 #endif
-
-
 void blink(void *args);
 char *get_types(char *stringf, int count);
 int variable_sprintf_size(char *string, int count, ...);

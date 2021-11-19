@@ -1,12 +1,14 @@
-#include "presence_detection.h"
+/* Blink Example
 
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+#include "presence_detection.h"
 // #include "hcicmds.h"
 // #include "hid_dev.h"
-
-#ifdef ARDUINO_ARCH_ESP32
-#include "esp32-hal-log.h"
-#endif
-
 
 //Start the addr list with room for 10 adresses
 #define PRESENCE_ADDR_LIST_START_SIZE 10

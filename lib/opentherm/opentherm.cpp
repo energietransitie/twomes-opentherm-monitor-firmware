@@ -1,10 +1,69 @@
 /*
 OpenTherm.cpp - OpenTherm Communication Library For Arduino, ESP8266
 Copyright 2018, Ihor Melnyk
+Modified by Henri ter Hofte, Windesheim for use in ESP-IDF in Twomes 
 */
 
 #include "opentherm.h"
 #include "esp_task_wdt.h"
+
+static xQueueHandle opentherm_gpio_evt_queue = NULL;
+static const char *TAG = "Twomes OpenTherm Library ESP32";
+
+//Gpio ISR handler for OpenTherm library: // TODO: check whether this does not clash with main ISR handler
+static void IRAM_ATTR opentherm_gpio_isr_handler(void *arg) {
+    uint32_t gpio_num = (uint32_t)arg;
+    xQueueSendFromISR(opentherm_gpio_evt_queue, &gpio_num, NULL);
+} //opentherm_gpio_isr_handler
+
+/**
+ * Check for input of buttons and the duration
+ * if the press duration was more than 10 seconds, erase the flash memory to restart provisioning
+ * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
+*/
+void buttonPressHandlerSpecific(void *args) {
+    uint32_t io_num;
+    while (1) {
+        if (xQueueReceive(opentherm_gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay: nothing happens if user presses button for less than 100 ms = 0.1s
+
+            //INTERRUPT HANDLER WIFI_RESET_BUTTON_GPIO16_SW1
+            if (io_num == WIFI_RESET_BUTTON_GPIO16_SW1) {
+                uint8_t halfSeconds = 0;
+                //Determine length of button press before taking action
+                while (!gpio_get_level(WIFI_RESET_BUTTON_GPIO16_SW1)) {
+                    //Button BOOT is (still) pressed
+                    vTaskDelay(500 / portTICK_PERIOD_MS); //Wait for 0.5s
+                    halfSeconds++;
+                    ESP_LOGD(TAG, "Button WIFI_RESET_BUTTON_GPIO16_SW1 has been pressed for %u half-seconds now", halfSeconds);
+                    if (halfSeconds >= LONG_BUTTON_PRESS_DURATION) {
+                        //Long press on WIFI_RESET_BUTTON_GPIO16_SW1 is for clearing Wi-Fi provisioning memory:
+                        ESP_LOGI("ISR", "Long-button press detected on button BOOT; resetting Wi-Fi provisioning and restarting device");
+                        char blinkArgs[2] = { 5, RED_LED_ERROR_GPIO22 };
+                        xTaskCreatePinnedToCore(blink, "blink_5_times_red", 768, (void *)blinkArgs, 10, NULL, 1);
+                        esp_wifi_restore();
+                        vTaskDelay(5 * (200+200) / portTICK_PERIOD_MS); //Wait for blink to finish
+                        esp_restart();                         //software restart, to enable linking to new Wi-Fi network.
+                        break;                                 //Exit loop (this should not be reached)
+                    }                                          //if (halfSeconds == 9)
+                    else if (gpio_get_level(WIFI_RESET_BUTTON_GPIO16_SW1)) {
+                        //Button WIFI_RESET_BUTTON_GPIO16_SW1 is released
+                        //Short press on WIFI_RESET_BUTTON_GPIO16_SW1 not used for anything currently
+                        ESP_LOGI("ISR", "Short button press detected on button BOOT");
+                    }
+                } //while(!gpio_level)
+            }
+        }     //if(xQueueReceive)
+    }  //while(1)
+} // buttonPressHandlerSpecific
+
+void opentherm_start_button_handler() {
+    opentherm_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    xTaskCreatePinnedToCore(buttonPressHandlerSpecific, "handle_button_pressed", 2048, NULL, 10, NULL, 1);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(WIFI_RESET_BUTTON_GPIO16_SW1, opentherm_gpio_isr_handler, (void *)WIFI_RESET_BUTTON_GPIO16_SW1);
+}
+
 OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : status(OpenThermStatus::NOT_INITIALIZED),
 															inPin(inPin),
 															outPin(outPin),
@@ -17,20 +76,24 @@ OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : status(OpenThermStat
 {
 }
 
+
 void OpenTherm::begin(void (*handleInterruptCallback)(void *), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus))
 {
 	if (handleInterruptCallback != NULL)
 	{
 		this->handleInterruptCallback = handleInterruptCallback;
-		status = OpenThermStatus::READY;
-		xTaskCreatePinnedToCore(handleInterruptCallback, "handleInterruptCallback", 2048, NULL, 10, NULL, 1);
-		// gpio_install_isr_service(0);
-		// gpio_isr_handler_add((gpio_num_t)inPin, gpio_isr_handler, (void*)inPin);
+		//TODO: attach interrupt handler ESP-IDF style
+		// Arduino code to attach interrupt
 		// attachInterrupt(digitalPinToInterrupt(inPin), handleInterruptCallback, CHANGE);
+
+		//ESP_IDF_CODE
+    	gpio_install_isr_service(0);
+		gpio_isr_handler_add((gpio_num_t)inPin, opentherm_gpio_isr_handler, (void*)inPin);
+
 	}
-	// activateBoiler();
+	status = OpenThermStatus::READY;
 	this->processResponseCallback = processResponseCallback;
-}
+} 
 
 void OpenTherm::begin(void (*handleInterruptCallback)(void *))
 {

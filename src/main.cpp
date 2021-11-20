@@ -1,20 +1,6 @@
 #include <string>
 #include <stdlib.h>
 #include "opentherm.h"
-
-#define WIFI_RESET_BUTTON   GPIO_NUM_16
-#define LED_ERROR           GPIO_NUM_22
-#define MASTER_IN_PIN       GPIO_NUM_19
-#define MASTER_OUT_PIN      GPIO_NUM_26 //24 does not exist!
-#define SLAVE_IN_PIN        GPIO_NUM_21
-#define SLAVE_OUT_PIN       GPIO_NUM_23
-
-#define INPUT_BITMASK       ( (1ULL << WIFI_RESET_BUTTON) | (1ULL << MASTER_IN_PIN) | (1ULL << SLAVE_IN_PIN) )
-#define OUTPUT_BITMASK      ( (1ULL << LED_ERROR) | (1ULL << SLAVE_OUT_PIN) | (1ULL << MASTER_OUT_PIN) )
-
-extern "C" {
-    #include <generic_esp_32.h>
-}
 #include "driver/timer.h"
 
 #define BOOT_STARTUP_INTERVAL_MS (10 * 60) // milliseconds ( 10 s * 1000 ms/s)
@@ -39,17 +25,11 @@ static const char rel_mod_lvl_property_name[]       = "relativeModulationLevel";
 static const char max_boiler_cap_property_name[]    = "maxBoilerCap";
 
 
-const int mInPin = MASTER_IN_PIN;  
-const int mOutPin = MASTER_OUT_PIN; 
+const int mInPin = MASTER_IN_PIN_GPIO19;  
+const int mOutPin = MASTER_OUT_PIN_GPIO26; 
 
-const int sInPin = SLAVE_IN_PIN;
-const int sOutPin = SLAVE_OUT_PIN; 
-
-#define DEBUG
-#define LED_BUILTIN 32
-#define LED LED_BUILTIN
-#define HTTP_TIMEOUT 3
-#define SSL_TIMEOUT 3
+const int sInPin = SLAVE_IN_PIN_GPIO21;
+const int sOutPin = SLAVE_OUT_PIN_GPIO23; 
 
 #define BOILER_MEASUREMENT_INTERVAL 10
 #define ROOM_TEMP_MEASUREMENT_INTERVAL 300
@@ -385,7 +365,10 @@ void processSendRequest(char data[9]) {
 // }
 
 //Function to initialise the buttons and LEDs, with interrupts on the buttons
-void initGPIO_OpenTherm() {
+void intialize_opentherm_gpio() {
+    ESP_LOGD(TAG, "starting initialize_opentherm_gpio();");
+    ESP_LOGD(TAG, "exiting initialize_opentherm_gpio()");
+
     gpio_config_t io_conf;
     //CONFIGURE OUTPUTS:
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -401,19 +384,28 @@ void initGPIO_OpenTherm() {
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
+
 }
 
 
-void intialize_opentherm() {
-    ESP_LOGD(TAG, "calling initGPIO_OpenTherm();");
-    initGPIO_OpenTherm();
-    //TODO: init handler for WIFI_RESET_BUTTON press
+
+
+void begin_opentherm() {
+
+    ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
+    initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
+
+    ESP_LOGD(TAG, "calling opentherm_start_button_handler()");
+    opentherm_start_button_handler();
+    
     ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
     mOT.begin(mHandleInterrupt, processMasterRequest);
     ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
     sOT.begin(sHandleInterrupt, processSlaveRequest);
-    ESP_LOGD(TAG, "exiting initialize_opentherm()");
+    ESP_LOGD(TAG, "starting main OpenTehrm processing loop");
+
 }
+
 
 // Work In-Progress
 // esp_err_t store_char_persistent(const char *storage_loc, const char *name, char *data) {
@@ -679,8 +671,8 @@ extern "C" {
 
 void app_main()
 {
-    ESP_LOGD(TAG, "calling initialize_opentherm()");
-    intialize_opentherm();
+    ESP_LOGD(TAG, "calling initialize_opentherm_GPIO()");
+    intialize_opentherm_gpio();
 
     twomes_device_provisioning(DEVICE_TYPE_NAME);
 
@@ -706,8 +698,8 @@ void app_main()
 
     ESP_LOGD(TAG, "Generic Setup complete");
 
-    ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
-    initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
+    ESP_LOGD(TAG, "calling begin_opentherm()");
+    begin_opentherm();
 
     while (1) {
         sOT.process();

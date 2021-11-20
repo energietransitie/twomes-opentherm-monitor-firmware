@@ -1,4 +1,4 @@
-#include "generic_esp_32.h"
+#include <generic_esp_32.h>
 
 static const char *TAG = "Twomes Generic Firmware Library ESP32";
 
@@ -1059,7 +1059,7 @@ void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
     // free(dat_str); // TODO: perhaps free needed here
 }
 
-bool disable_wifi(char *taskString) {
+bool disable_wifi(const char *taskString) {
     if (esp_wifi_stop() == ESP_OK) {
         ESP_LOGD(TAG, "Disabled Wi-Fi");
         wifi_initialized = false;
@@ -1090,7 +1090,7 @@ bool disable_wifi_keeping_802_11_mutex(){
 }
 
 
-bool enable_wifi(char *taskString) {
+bool enable_wifi(const char *taskString) {
     if (xSemaphoreTakeRecursive(wireless_802_11_mutex, MAX_WAIT_802_11_MS / portTICK_PERIOD_MS)) {
         ESP_LOGD(TAG, "%s got access to 802_11 resource at %s", taskString, esp_log_system_timestamp());
         if (esp_wifi_start() == ESP_OK) {
@@ -1109,7 +1109,7 @@ bool enable_wifi(char *taskString) {
     }
 }
 
-bool disconnect_wifi(char *taskString) {
+bool disconnect_wifi(const char *taskString) {
     wifi_autoconnect = false;
     esp_err_t err = esp_wifi_disconnect();
     if (err == ESP_OK) {
@@ -1126,7 +1126,7 @@ bool disconnect_wifi(char *taskString) {
     }
 }
 
-bool connect_wifi(char *taskString) {
+bool connect_wifi(const char *taskString) {
     if (xSemaphoreTakeRecursive(wireless_802_11_mutex, MAX_WAIT_802_11_MS / portTICK_PERIOD_MS)) {
         ESP_LOGD(TAG, "%s got access to 802_11 resource at %s", taskString, esp_log_system_timestamp());
         esp_err_t err;

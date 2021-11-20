@@ -136,7 +136,7 @@ public:
 	unsigned long buildResponse(OpenThermMessageType type, OpenThermMessageID id, unsigned int data);
 	OpenThermResponseStatus getLastResponseStatus();
 	const char *statusToString(OpenThermResponseStatus status);
-	void handleInterrupt();
+	void handleInterrupt(void *);
 	void process();
 	void end();
 

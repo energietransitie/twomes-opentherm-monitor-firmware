@@ -23,6 +23,22 @@ extern "C" {
 #define DEVICE_TYPE_NAME "OpenTherm-Monitor"
 static const char *TAG = "Twomes ESP32 Arduiono framework based OpenTherm Monitor";
 
+char variable_upload_payload_template[] = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
+    "%s"
+    "]}";
+
+static const char supply_temp_property_name[]       = "boilerSupplyTemp";
+static const char return_temp_property_name[]       = "boilerReturnTemp";
+static const char ch_mode_property_name[]           = "isCentralHeatingModeOn";
+static const char dhw_mode_property_name[]          = "isDomesticHotWaterModeOn";
+static const char flame_property_name[]             = "isBoilerFlameOn";
+static const char room_set_point_property_name[]    = "roomSetpointTemp";
+static const char max_rel_mod_lvl_property_name[]   = "maxModulationLevel";
+static const char min_mod_lvl_property_name[]       = "minModulationLevel";
+static const char rel_mod_lvl_property_name[]       = "relativeModulationLevel";
+static const char max_boiler_cap_property_name[]    = "maxBoilerCap";
+
+
 const int mInPin = MASTER_IN_PIN;  
 const int mOutPin = MASTER_OUT_PIN; 
 
@@ -116,12 +132,12 @@ typedef struct {
     bool auto_reload;
 } seconds_timer_info_t;
 
-void ICACHE_RAM_ATTR mHandleInterrupt(void*) {
-    mOT.handleInterrupt();
+void ICACHE_RAM_ATTR mHandleInterrupt(void *) {
+    mOT.handleInterrupt(NULL);
 }
 
-void ICACHE_RAM_ATTR sHandleInterrupt(void*) {
-    sOT.handleInterrupt();
+void ICACHE_RAM_ATTR sHandleInterrupt(void *) {
+    sOT.handleInterrupt(NULL);
 }
 
 bool IRAM_ATTR timer_group_isr_callback(void *args) {
@@ -182,17 +198,17 @@ void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool aut
 
 void processSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Request from boiler: %lu", request);
+    ESP_LOGD(TAG, "Request from boiler: %lX", request);
     char data[10];
-    sprintf(data, "B%X", (unsigned int) request); //TODO: check if typecasging to unsigned int is allowed here
+    sprintf(data, "B%lX", request); //TODO: check if storing as 8-character hexadecimal is ok
     strcpy(dataBufferSlave[bufferSlaveCount++], data);
 }
 
 void processMasterRequest(unsigned long request, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Request from thermostat: %lu", request);
+    ESP_LOGD(TAG, "Request from thermostat: %lX", request);
     char data[10];
-    sprintf(data, "T%X", (unsigned int) request); //TODO: check if typecasging to unsigned int is allowed here
+    sprintf(data, "T%lX", request); //TODO: check if storing as 8-character hexadecimal is ok
     strcpy(dataBufferMaster[bufferMasterCount++], data);
 }
 
@@ -574,8 +590,8 @@ void upload_data() {
     ESP_LOGD(TAG, "boiler cap: %s\n", max_boiler_cap_str.c_str());
 }
 
-char *get_property_string_char(char *prop_name, uint32_t time, char *value) {
-    char *property_string_char = "{\"property_name\": \"%s\","
+char *get_property_string_char(const char *prop_name, uint32_t time, char *value) {
+    char property_string_char[] = "{\"property_name\": \"%s\","
         "\"measurements\": ["
         "{ \"timestamp\":\"%d\","
         "\"value\":\"%s\"}]}";
@@ -588,8 +604,8 @@ char *get_property_string_char(char *prop_name, uint32_t time, char *value) {
     return property_str;
 }
 
-char *get_property_string_integer(char *prop_name, uint32_t time, int value) {
-    char *property_string_integer = "{\"property_name\": \"%s\","
+char *get_property_string_integer(const char *prop_name, uint32_t time, int value) {
+    char property_string_integer[] = "{\"property_name\": \"%s\","
         "\"measurements\": ["
         "{ \"timestamp\":\"%d\","
         "\"value\":\"%d\"}]}";
@@ -603,18 +619,15 @@ char *get_property_string_integer(char *prop_name, uint32_t time, int value) {
 }
 
 char *get_boiler_measurements_data(uint32_t time) {
-    char *msg_multiple_string = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
-        "%s"
-        "]}";
     //Get size of the message after inputting variables.
-    std::string boiler_temp_property(get_property_string_char("boilerSupplyTemp", time, boilerTemp));
-    std::string return_temp_property(get_property_string_char("boilerReturnTemp", time, returnTemp));
+    std::string supply_temp_property(get_property_string_char(supply_temp_property_name, time, boilerTemp));
+    std::string return_temp_property(get_property_string_char(return_temp_property_name, time, returnTemp));
 
-    std::string combined_properties = boiler_temp_property + ", " + return_temp_property;
+    std::string combined_properties = supply_temp_property + ", " + return_temp_property;
 
-    int msgSize = variable_sprintf_size(msg_multiple_string, 2, time, combined_properties.c_str());
+    int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
-    snprintf(msg, msgSize, msg_multiple_string, time, combined_properties.c_str());
+    snprintf(msg, msgSize, variable_upload_payload_template, time, combined_properties.c_str());
     ESP_LOGD(TAG, "Data: %s", msg);
 
     // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
@@ -631,24 +644,21 @@ char *get_boiler_measurements_data(uint32_t time) {
 }
 
 char *get_regular_measurements_data(uint32_t time) {
-    char *msg_multiple_string = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
-        "%s"
-        "]}";
     //Get size of the message after inputting variables.
-    std::string ch_mode_property(get_property_string_integer("isCentralHeatingModeOn", time, ch_mode));
-    std::string dhw_mode_property(get_property_string_integer("isDomesticHotWaterModeOn", time, dhw_mode));
-    std::string flame_property(get_property_string_integer("isBoilerFlameOn", time, flame));
-    std::string room_set_point_property(get_property_string_char("roomSetpointTemp", time, roomSetpoint));
-    std::string max_rel_mod_lvl_property(get_property_string_char("maxModulationLevel", time, maxRelModLvl));
-    std::string min_mod_lvl_property(get_property_string_integer("minModulationLevel", time, minModLvl));
-    std::string rel_mod_lvl_property(get_property_string_char("relativeModulationLevel", time, relModLvl));
-    std::string max_boiler_cap_property(get_property_string_integer("maxBoilerCap", time, maxBoilerCap));
+    std::string ch_mode_property(get_property_string_integer(ch_mode_property_name, time, ch_mode));
+    std::string dhw_mode_property(get_property_string_integer(dhw_mode_property_name, time, dhw_mode));
+    std::string flame_property(get_property_string_integer(flame_property_name, time, flame));
+    std::string room_set_point_property(get_property_string_char(room_set_point_property_name, time, roomSetpoint));
+    std::string max_rel_mod_lvl_property(get_property_string_char(max_rel_mod_lvl_property_name, time, maxRelModLvl));
+    std::string min_mod_lvl_property(get_property_string_integer(min_mod_lvl_property_name, time, minModLvl));
+    std::string rel_mod_lvl_property(get_property_string_char(rel_mod_lvl_property_name, time, relModLvl));
+    std::string max_boiler_cap_property(get_property_string_integer(max_rel_mod_lvl_property_name, time, maxBoilerCap));
 
     std::string combined_properties = ch_mode_property + ", " + dhw_mode_property + ", " + flame_property + ", " + room_set_point_property + ", " + max_rel_mod_lvl_property + ", " + min_mod_lvl_property + ", " + rel_mod_lvl_property + ", " + max_boiler_cap_property;
 
-    int msgSize = variable_sprintf_size(msg_multiple_string, 2, time, combined_properties.c_str());
+    int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
-    snprintf(msg, msgSize, msg_multiple_string, time, combined_properties.c_str());
+    snprintf(msg, msgSize, variable_upload_payload_template, time, combined_properties.c_str());
     ESP_LOGD(TAG, "Data: %s", msg);
 
 
@@ -663,14 +673,12 @@ char *get_regular_measurements_data(uint32_t time) {
     return msg;
 }
 
+extern "C" {
+    void app_main();
+}
 
-void app_main(void)
+void app_main()
 {
-    char *msg_multiple_string = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
-        "%s"
-        "]}";
-
-
     ESP_LOGD(TAG, "calling initialize_opentherm()");
     intialize_opentherm();
 
@@ -736,11 +744,11 @@ void app_main(void)
             ESP_LOGD(TAG, "Measuring and uploading room temp");
             //Get size of the message after inputting variables.
             char *room_temp_property = get_property_string_char("roomTemp", time(NULL), roomTemp);
-            int msgSize = variable_sprintf_size(msg_multiple_string, 2, time(NULL), room_temp_property);
+            int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time(NULL), room_temp_property);
             //Allocating enough memory so inputting the variables into the string doesn't overflow
             char *msg = (char *)malloc(msgSize);
             //Inputting variables into the plain json string from above(msgPlain).
-            snprintf(msg, msgSize, msg_multiple_string, time(NULL), room_temp_property);
+            snprintf(msg, msgSize, variable_upload_payload_template, time(NULL), room_temp_property);
             //Posting data over HTTPS, using url, msg and bearer token.
             ESP_LOGD(TAG, "Data: %s", msg);
             upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);

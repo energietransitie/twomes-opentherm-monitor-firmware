@@ -125,8 +125,8 @@ void timesync(bool already_connected);
 void initialize_timezone(char *timezone);
 #define POST_WITH_BEARER true
 #define POST_WITHOUT_BEARER false
-int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
-int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
+int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
+int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
 char *get_bearer();

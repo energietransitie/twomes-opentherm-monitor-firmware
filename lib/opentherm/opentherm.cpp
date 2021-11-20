@@ -17,7 +17,7 @@ OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : status(OpenThermStat
 {
 }
 
-void OpenTherm::begin(void (*handleInterruptCallback)(void*), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus))
+void OpenTherm::begin(void (*handleInterruptCallback)(void *), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus))
 {
 	if (handleInterruptCallback != NULL)
 	{
@@ -32,7 +32,7 @@ void OpenTherm::begin(void (*handleInterruptCallback)(void*), void (*processResp
 	this->processResponseCallback = processResponseCallback;
 }
 
-void OpenTherm::begin(void (*handleInterruptCallback)(void*))
+void OpenTherm::begin(void (*handleInterruptCallback)(void *))
 {
 	begin(handleInterruptCallback, NULL);
 }
@@ -154,7 +154,7 @@ OpenThermResponseStatus OpenTherm::getLastResponseStatus()
 	return responseStatus;
 }
 
-void ICACHE_RAM_ATTR OpenTherm::handleInterrupt()
+void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *)
 {
 	esp_task_wdt_reset();
 	if (isReady())

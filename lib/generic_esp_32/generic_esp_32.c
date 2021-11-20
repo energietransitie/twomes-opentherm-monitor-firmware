@@ -736,7 +736,7 @@ void activate_device() {
     }
 }
 
-int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size) {
+int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size) {
     int connect_retry_counter = 0;
     int upload_retry_counter = 0;
     int content_length = 0;
@@ -889,7 +889,7 @@ int post_https(char *endpoint, bool use_bearer, bool already_connected, char *da
     return status_code;
 }
 
-int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size) {
+int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size) {
     return post_https(endpoint, use_bearer, NOT_ALREADY_CONNECTED, data, response_buf, resp_buf_size);
 }
 

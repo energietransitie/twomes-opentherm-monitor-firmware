@@ -9,9 +9,12 @@ Frame Structure:
 P MGS-TYPE SPARE DATA-ID  DATA-VALUE
 0 000      0000  00000000 00000000 00000000
 */
+#ifndef OPENTHERM_H
+#define OPENTHERM_H
 
-// #ifndef OpenTherm_h
-// #define OpenTherm_h
+extern "C" {
+#include <generic_esp_32.h>
+}
 
 #include <stdint.h>
 #include <freertos/FreeRTOS.h>
@@ -22,9 +25,6 @@ P MGS-TYPE SPARE DATA-ID  DATA-VALUE
 #include "driver/gpio.h"
 #include <esp_log.h>
 
-extern "C" {
-    #include <generic_esp_32.h>
-}
 
 #define WIFI_RESET_BUTTON_GPIO16_SW1    GPIO_NUM_16
 #define RED_LED_ERROR_GPIO22            GPIO_NUM_22
@@ -37,16 +37,14 @@ extern "C" {
 #define OUTPUT_BITMASK      ( (1ULL << RED_LED_ERROR_GPIO22) | (1ULL << SLAVE_OUT_PIN_GPIO23) | (1ULL << MASTER_OUT_PIN_GPIO26) )
 
 
-enum OpenThermResponseStatus
-{
+enum OpenThermResponseStatus {
 	NONE,
 	SUCCESS,
 	INVALID,
 	TIMEOUT
 };
 
-enum OpenThermMessageType
-{
+enum OpenThermMessageType {
 	/*  Master to Slave */
 	READ_DATA = 0x000,
 	READ = READ_DATA, // for backwared compatibility
@@ -63,8 +61,7 @@ enum OpenThermMessageType
 
 typedef OpenThermMessageType OpenThermRequestType; // for backwared compatibility
 
-enum OpenThermMessageID
-{
+enum OpenThermMessageID {
 	Status,						  // flag8 / flag8  Master and Slave Status flags.
 	TSet,						  // f8.8  Control setpoint  ie CH  water temperature setpoint (°C)
 	MConfigMMemberIDcode,		  // flag8 / u8  Master Configuration Flags /  Master MemberID Code
@@ -121,8 +118,7 @@ enum OpenThermMessageID
 	SlaveVersion,				  // u8 / u8  Slave product version number and type
 };
 
-enum OpenThermStatus
-{
+enum OpenThermStatus {
 	NOT_INITIALIZED,
 	READY,
 	DELAY,
@@ -136,8 +132,7 @@ enum OpenThermStatus
 
 void start_opentherm_interrupt_handling();
 
-class OpenTherm
-{
+class OpenTherm {
 public:
 	OpenTherm(int inPin = 4, int outPin = 5, bool isSlave = false);
 	volatile OpenThermStatus status;
@@ -213,4 +208,4 @@ private:
 #define ICACHE_RAM_ATTR
 #endif
 
-// #endif // OpenTherm_h
+#endif // OpenTherm_h

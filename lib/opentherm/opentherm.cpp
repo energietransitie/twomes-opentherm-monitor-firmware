@@ -20,15 +20,29 @@ static void IRAM_ATTR opentherm_gpio_isr_handler(void *arg) {
  * Check for input of buttons and the duration
  * if the press duration was more than 10 seconds, erase the flash memory to restart provisioning
  * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
+ * also, check for OpenTherm interrupt
 */
-void buttonPressHandlerSpecific(void *args) {
+void openthermInterruptHandler(void *args) {
     uint32_t io_num;
-    while (1) {
-        if (xQueueReceive(opentherm_gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay: nothing happens if user presses button for less than 100 ms = 0.1s
+	extern OpenTherm mOT; //TODO: check whether this is correct
+	extern OpenTherm sOT; //TODO: check whether this is correct
 
-            //INTERRUPT HANDLER WIFI_RESET_BUTTON_GPIO16_SW1
-            if (io_num == WIFI_RESET_BUTTON_GPIO16_SW1) {
+    while (1) {
+
+        if (xQueueReceive(opentherm_gpio_evt_queue, &io_num, portMAX_DELAY)) {
+			//TODO: achieve similar effect as Arduino code in OpenTherm::begin calls on mOT and sOT
+			// attachInterrupt(digitalPinToInterrupt(MASTER_IN_PIN_GPIO19), mOT.handleInterrupt, CHANGE);
+			// attachInterrupt(digitalPinToInterrupt(SLAVE_IN_PIN_GPIO21), sOT.handleInterrupt, CHANGE);
+
+            if (io_num == MASTER_IN_PIN_GPIO19) {
+				mOT.handleInterrupt(NULL);
+			}
+			else if (io_num == SLAVE_IN_PIN_GPIO21) {
+				sOT.handleInterrupt(NULL);
+			}
+	        else if (io_num == WIFI_RESET_BUTTON_GPIO16_SW1) {
+	            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay: nothing happens if user presses button for less than 100 ms = 0.1s
+				//INTERRUPT HANDLER WIFI_RESET_BUTTON_GPIO16_SW1
                 uint8_t halfSeconds = 0;
                 //Determine length of button press before taking action
                 while (!gpio_get_level(WIFI_RESET_BUTTON_GPIO16_SW1)) {
@@ -55,11 +69,11 @@ void buttonPressHandlerSpecific(void *args) {
             }
         }     //if(xQueueReceive)
     }  //while(1)
-} // buttonPressHandlerSpecific
+} // openthermInterruptHandler
 
-void opentherm_start_button_handler() {
+void start_opentherm_interrupt_handling() {
     opentherm_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    xTaskCreatePinnedToCore(buttonPressHandlerSpecific, "handle_button_pressed", 2048, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(openthermInterruptHandler, "handle_opentehrm_interrups", 2048, NULL, 10, NULL, 1);
     gpio_install_isr_service(0);
     gpio_isr_handler_add(WIFI_RESET_BUTTON_GPIO16_SW1, opentherm_gpio_isr_handler, (void *)WIFI_RESET_BUTTON_GPIO16_SW1);
 }

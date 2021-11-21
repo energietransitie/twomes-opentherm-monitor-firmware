@@ -134,7 +134,7 @@ enum OpenThermStatus
 	RESPONSE_INVALID
 };
 
-void opentherm_start_button_handler();
+void start_opentherm_interrupt_handling();
 
 class OpenTherm
 {

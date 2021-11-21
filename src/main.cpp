@@ -395,15 +395,15 @@ void begin_opentherm() {
     ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
     initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
 
-    ESP_LOGD(TAG, "calling opentherm_start_button_handler()");
-    opentherm_start_button_handler();
-    
     ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
     mOT.begin(mHandleInterrupt, processMasterRequest);
     ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
     sOT.begin(sHandleInterrupt, processSlaveRequest);
-    ESP_LOGD(TAG, "starting main OpenTehrm processing loop");
+    ESP_LOGD(TAG, "starting main OpenTherm processing loop");
 
+    ESP_LOGD(TAG, "calling start_opentherm_interrupts_handling()");
+    start_opentherm_interrupt_handling();
+    
 }
 
 

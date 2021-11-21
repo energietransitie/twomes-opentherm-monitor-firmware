@@ -67,7 +67,7 @@
 #define MAX_WAIT_802_11_TXT "30 seconds"
 #endif
 
-xSemaphoreHandle wireless_802_11_mutex;
+extern xSemaphoreHandle wireless_802_11_mutex;
 
 #ifdef CONFIG_TWOMES_TEST_SERVER
 #define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"

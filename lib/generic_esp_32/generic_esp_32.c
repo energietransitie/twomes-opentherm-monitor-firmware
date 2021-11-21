@@ -11,6 +11,8 @@ const int WIFI_CONNECTED_EVENT = BIT0;
 
 char *bearer = NULL;
 
+xSemaphoreHandle wireless_802_11_mutex;
+
 // Twomes servers at *.energietransitiewindesheim.nl use Let's Encrypt certificates
 // based on https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
 // we use the ISRG Root X1 certificate found at https://letsencrypt.org/certs/isrgrootx1.pem
@@ -114,7 +116,7 @@ void buttonPressHandlerGeneric(void *args) {
                         char blinkArgs[2] = { 5, RED_LED_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink_5_times_red", 768, (void *)blinkArgs, 10, NULL, 1);
                         esp_wifi_restore();
-                        vTaskDelay(5 * (200+200) / portTICK_PERIOD_MS); //Wait for blink to finish
+                        vTaskDelay(5 * (200 + 200) / portTICK_PERIOD_MS); //Wait for blink to finish
                         esp_restart();                         //software restart, to enable linking to new Wi-Fi network.
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
@@ -560,7 +562,7 @@ void timesync(bool already_connected) {
         if (connect_wifi("timesync")) {
 
             ESP_LOGD(TAG, "Waiting for IP connection...");
-            xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY); 
+            xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
             //Wait to make extra sure Wi-Fi is connected and stable
             vTaskDelay(HTTPS_PRE_WAIT_MS / portTICK_PERIOD_MS);
             ESP_LOGD(TAG, "Waiting for IP connection... done; initiating timesync call");
@@ -790,11 +792,11 @@ int post_https(const char *endpoint, bool use_bearer, bool already_connected, ch
     esp_http_client_set_post_field(client, data, strlen(data));
     ESP_LOGD(TAG, "Free heap: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
 
-    if (!already_connected){
-        connect_success = connect_wifi(endpoint); 
+    if (!already_connected) {
+        connect_success = connect_wifi(endpoint);
         while (!connect_success && ++connect_retry_counter < WIFI_CONNECT_RETRIES) {
             ESP_LOGE(TAG, "Failed to connect to Wi-Fi (%d/%d) at %s", connect_retry_counter, WIFI_CONNECT_RETRIES, esp_log_system_timestamp());
-            connect_success = connect_wifi(endpoint); 
+            connect_success = connect_wifi(endpoint);
         }
 
         if (!connect_success) {
@@ -810,7 +812,7 @@ int post_https(const char *endpoint, bool use_bearer, bool already_connected, ch
         }
 
         ESP_LOGD(TAG, "Waiting for IP connection...");
-        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY); 
+        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
         ESP_LOGD(TAG, "Waiting for IP connection... done");
 
         //Wait to make extra sure Wi-Fi is connected and stable
@@ -1075,7 +1077,7 @@ bool disable_wifi(const char *taskString) {
     }
 }
 
-bool disable_wifi_keeping_802_11_mutex(){
+bool disable_wifi_keeping_802_11_mutex() {
     if (esp_wifi_stop() == ESP_OK) {
         ESP_LOGD(TAG, "Disabled Wi-Fi without releasing 802.11 mutex");
         wifi_initialized = false;

@@ -176,11 +176,11 @@ void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool aut
     timer_start(group, timer);
 }
 
-void processSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
+void processSlaveRequest(unsigned long response, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Request from boiler: %lX", request);
+    ESP_LOGD(TAG, "Response from boiler: %lX", response);
     char data[10];
-    sprintf(data, "B%lX", request); //TODO: check if storing as 8-character hexadecimal is ok
+    sprintf(data, "B%lX", response); //TODO: check if storing as 8-character hexadecimal is ok
     strcpy(dataBufferSlave[bufferSlaveCount++], data);
 }
 

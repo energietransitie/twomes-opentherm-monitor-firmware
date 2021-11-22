@@ -25,16 +25,21 @@ extern "C" {
 #include "driver/gpio.h"
 #include <esp_log.h>
 
-
+// Button and LED gpio pin definitions
 #define WIFI_RESET_BUTTON_GPIO16_SW1    GPIO_NUM_16
 #define RED_LED_ERROR_GPIO22            GPIO_NUM_22
+
+//OpenTherm gpio pin definitions
 #define MASTER_IN_PIN_GPIO19            GPIO_NUM_19
 #define MASTER_OUT_PIN_GPIO26           GPIO_NUM_26
 #define SLAVE_IN_PIN_GPIO21             GPIO_NUM_21
 #define SLAVE_OUT_PIN_GPIO23            GPIO_NUM_23
 
-#define INPUT_BITMASK       ( (1ULL << WIFI_RESET_BUTTON_GPIO16_SW1) | (1ULL << MASTER_IN_PIN_GPIO19) | (1ULL << SLAVE_IN_PIN_GPIO21) )
-#define OUTPUT_BITMASK      ( (1ULL << RED_LED_ERROR_GPIO22) | (1ULL << SLAVE_OUT_PIN_GPIO23) | (1ULL << MASTER_OUT_PIN_GPIO26) )
+#define BUTTON_AND_LED_INPUT_BITMASK    (1ULL << WIFI_RESET_BUTTON_GPIO16_SW1)
+#define BUTTON_AND_LED_OUTPUT_BITMASK   (1ULL << RED_LED_ERROR_GPIO22)
+
+#define OPENTHERM_INPUT_BITMASK       ( (1ULL << MASTER_IN_PIN_GPIO19) | (1ULL << SLAVE_IN_PIN_GPIO21) )
+#define OPENTHERM_OUTPUT_BITMASK      ( (1ULL << SLAVE_OUT_PIN_GPIO23) | (1ULL << MASTER_OUT_PIN_GPIO26) )
 
 
 enum OpenThermResponseStatus {

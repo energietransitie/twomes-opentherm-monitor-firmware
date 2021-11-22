@@ -234,7 +234,8 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 		}
 	}
 	else if (status == OpenThermStatus::RESPONSE_START_BIT) {
-		ESP_LOGI("OpenTherm", "Diff: %lu", newTs - responseTimestamp);
+		float diff = float ((newTs - responseTimestamp))/1000000;
+		ESP_LOGI(TAG, "Time to response start bit: %.2f s", diff);
 		if ((newTs - responseTimestamp < 750) && readState() == 0) {
 			status = OpenThermStatus::RESPONSE_RECEIVING;
 			responseTimestamp = newTs;

@@ -7,7 +7,7 @@
 #define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
 
 #define DEVICE_TYPE_NAME "OpenTherm-Monitor"
-static const char *TAG = "Twomes ESP32 Arduiono framework based OpenTherm Monitor";
+static const char *TAG = "Twomes ESP32 OpenTherm Monitor main";
 
 char variable_upload_payload_template[] = "{\"upload_time\": \"%d\",\"property_measurements\":[ "
     "%s"

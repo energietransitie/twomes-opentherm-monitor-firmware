@@ -270,7 +270,7 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 
 	unsigned long newTs = esp_timer_get_time();
 	if (status == OpenThermStatus::RESPONSE_WAITING) {
-		if (readState() == 1) {
+		if (readState() == HIGH) {
 			status = OpenThermStatus::RESPONSE_START_BIT;
 		}
 		else {

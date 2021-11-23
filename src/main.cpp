@@ -26,10 +26,10 @@ static const char max_boiler_cap_property_name[]    = "maxBoilerCap";
 
 
 const int mInPin = MASTER_IN_PIN_GPIO19;  
-const int mOutPin = MASTER_OUT_PIN_GPIO26; 
+const int mOutPin = MASTER_OUT_PIN_GPIO26; //not conected
 
 const int sInPin = SLAVE_IN_PIN_GPIO21;
-const int sOutPin = SLAVE_OUT_PIN_GPIO23; 
+const int sOutPin = SLAVE_OUT_PIN_GPIO23; //not connected
 
 #define BOILER_MEASUREMENT_INTERVAL 10
 #define ROOM_TEMP_MEASUREMENT_INTERVAL 300
@@ -60,7 +60,7 @@ int minModLvl_data[REGULAR_MEASUREMENT_MAX];                               // Mi
 char relModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Relative modulation level
 int maxBoilerCapStorage_data[REGULAR_MEASUREMENT_MAX];                     // Maximum boiler capacity
 
-OpenTherm mOT(mInPin, mOutPin, true);
+OpenTherm mOT(mInPin, mOutPin);
 OpenTherm sOT(sInPin, sOutPin, true);
 
 int ch_mode = 0;                // Central heating mode (ON/OFF)
@@ -176,22 +176,19 @@ void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool aut
     timer_start(group, timer);
 }
 
-void processSlaveRequest(unsigned long frame, OpenThermResponseStatus status) {
-    //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Data frame from boiler: %lX", frame);
-    char data[10];
-    sprintf(data, "B%lX", frame); 
-    strcpy(dataBufferSlave[bufferSlaveCount++], data);
+void processRequest(unsigned long request, OpenThermResponseStatus status) {
+    ESP_LOGD(TAG, "Request frame from thermostat: %lX", request); //TODO: Can ESP_LOGD  be used from an interrupt?
+    char request_data[10];
+    sprintf(request_data, "T%lX", request); 
+    strcpy(dataBufferSlave[bufferSlaveCount++], request_data);
+    unsigned long response = mOT.sendRequest(request);
+    if (response) {
+        ESP_LOGD(TAG, "Response frame from boiler: %lX", response); //TODO: Can ESP_LOGD  be used from an interrupt?
+        char response_data[10];
+        sprintf(response_data, "B%lX", response); 
+        strcpy(dataBufferMaster[bufferMasterCount++], response_data);
+    }
 }
-
-void processMasterRequest(unsigned long frame, OpenThermResponseStatus status) {
-    //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Data frame from thermostat: %lX", frame);
-    char data[10];
-    sprintf(data, "T%lX", frame); 
-    strcpy(dataBufferMaster[bufferMasterCount++], data);
-}
-
 
 void processSendRequest(char data[9]) {
     ESP_LOGD(TAG, "Processing data: %c%c%c%c%c%c%c%c%c",
@@ -397,9 +394,9 @@ void begin_opentherm() {
     initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
 
     ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
-    mOT.begin(mHandleInterrupt, processMasterRequest);
+    mOT.begin(mHandleInterrupt);
     ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
-    sOT.begin(sHandleInterrupt, processSlaveRequest);
+    sOT.begin(sHandleInterrupt, processRequest);
     ESP_LOGD(TAG, "starting main OpenTherm processing loop");
 
     
@@ -707,14 +704,14 @@ void app_main()
 
     while (1) {
         sOT.process();
-        mOT.process();
+        //mOT.process();
         if (bufferSlaveCount != 0) {
-            processSendRequest(dataBufferSlave[--bufferSlaveCount]);
             ESP_LOGD(TAG, "Slave Count: %d", bufferSlaveCount);
+            processSendRequest(dataBufferSlave[--bufferSlaveCount]);
         }
         if (bufferMasterCount != 0) {
-            processSendRequest(dataBufferMaster[--bufferMasterCount]);
             ESP_LOGD(TAG, "Master Count: %d", bufferMasterCount);
+            processSendRequest(dataBufferMaster[--bufferMasterCount]);
         }
         if (upload_timer_count >= OPENTHERM_UPLOAD_INTERVAL) {
             // ESP_LOGE(TAG, "Uploading all buffered data!");

@@ -1,10 +1,5 @@
-/*
-OpenTherm.cpp - OpenTherm Communication Library For Arduino, ESP8266
-Copyright 2018, Ihor Melnyk
-Modified by Henri ter Hofte, Windesheim for use in ESP-IDF in Twomes
-*/
-
 #include "opentherm.h"
+#include <bitset>         // std::bitset
 
 static xQueueHandle opentherm_gpio_evt_queue = NULL;
 static const char *TAG = "Twomes OpenTherm Library ESP32";
@@ -15,24 +10,15 @@ static void IRAM_ATTR opentherm_gpio_isr_handler(void *arg) {
 	xQueueSendFromISR(opentherm_gpio_evt_queue, &gpio_num, NULL);
 } //opentherm_gpio_isr_handler
 
-/**
- * Check for input of buttons and the duration
- * if the press duration was more than 10 seconds, erase the flash memory to restart provisioning
- * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
- * also, check for OpenTherm interrupt
-*/
 void openthermInterruptHandler(void *args) {
 	uint32_t io_num;
 	extern OpenTherm mOT; //TODO: check whether this is correct
 	extern OpenTherm sOT; //TODO: check whether this is correct
-
-	while (1) {
-
+	while (true) {
 		if (xQueueReceive(opentherm_gpio_evt_queue, &io_num, portMAX_DELAY)) {
 			//TODO: achieve similar effect as Arduino code in OpenTherm::begin calls on mOT and sOT
 			// attachInterrupt(digitalPinToInterrupt(MASTER_IN_PIN_GPIO19), mOT.handleInterrupt, CHANGE);
 			// attachInterrupt(digitalPinToInterrupt(SLAVE_IN_PIN_GPIO21), sOT.handleInterrupt, CHANGE);
-
 			if (io_num == MASTER_IN_PIN_GPIO19) {
 				mOT.handleInterrupt(NULL);
 			}
@@ -67,8 +53,30 @@ void openthermInterruptHandler(void *args) {
 				} //while(!gpio_level)
 			}
 		}     //if(xQueueReceive)
-	}  //while(1)
+	}  //while(true)
 } // openthermInterruptHandler
+
+void intialize_opentherm_gpio() {
+    ESP_LOGD(TAG, "starting initialize_opentherm_gpio();");
+
+    gpio_config_t io_conf;
+    //CONFIGURE OUTPUTS:
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = OPENTHERM_OUTPUT_BITMASK;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+    //CONFIGURE INPUTS:
+    io_conf.intr_type = GPIO_INTR_ANYEDGE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = OPENTHERM_INPUT_BITMASK;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+
+    ESP_LOGD(TAG, "exiting initialize_opentherm_gpio()");
+}
 
 void start_opentherm_interrupt_handling() {
 	opentherm_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -77,25 +85,31 @@ void start_opentherm_interrupt_handling() {
 	gpio_isr_handler_add(WIFI_RESET_BUTTON_GPIO16_SW1, opentherm_gpio_isr_handler, (void *)WIFI_RESET_BUTTON_GPIO16_SW1);
 }
 
-OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : status(OpenThermStatus::NOT_INITIALIZED),
-inPin(inPin),
-outPin(outPin),
-isSlave(isSlave),
-response(0),
-responseStatus(OpenThermResponseStatus::NONE),
-responseTimestamp(0),
-handleInterruptCallback(NULL),
-processResponseCallback(NULL) {}
+OpenTherm::OpenTherm(int inPin, int outPin, bool isSlave) : 
+	status(OpenThermStatus::NOT_INITIALIZED),
+	inPin(inPin),
+	outPin(outPin),
+	isSlave(isSlave),
+	response(0),
+	responseStatus(OpenThermResponseStatus::NONE),
+	responseTimestamp(0),
+	handleInterruptCallback(NULL),
+	processResponseCallback(NULL) {}
 
 
 void OpenTherm::begin(void (*handleInterruptCallback)(void *), void (*processResponseCallback)(unsigned long, OpenThermResponseStatus)) {
+		//Arduino code:
+		//pinMode(inPin, INPUT);
+		//pinMode(outPin, OUTPUT);
+
+		//ESP-IDF code:
+		//set gpio configuration in  
 	if (handleInterruptCallback != NULL) {
 		this->handleInterruptCallback = handleInterruptCallback;
-		//TODO: attach interrupt handler ESP-IDF style
-		// Arduino code to attach interrupt
-		// attachInterrupt(digitalPinToInterrupt(inPin), handleInterruptCallback, CHANGE);
+		//Arduino code:
+		//attachInterrupt(digitalPinToInterrupt(inPin), handleInterruptCallback, CHANGE);
 
-		//ESP_IDF_CODE
+		//ESP-IDF code:
 		gpio_install_isr_service(0);
 		gpio_isr_handler_add((gpio_num_t)inPin, opentherm_gpio_isr_handler, (void *)inPin);
 
@@ -113,27 +127,41 @@ bool ICACHE_RAM_ATTR OpenTherm::isReady() {
 }
 
 int ICACHE_RAM_ATTR OpenTherm::readState() {
+	// Arduino code:
+	// return digitalRead(inPin);
+
+	// ESP-IDF code:
 	return gpio_get_level((gpio_num_t)inPin);
 }
 
 void OpenTherm::setActiveState() {
-	esp_err_t err = gpio_set_level((gpio_num_t)outPin, 0);
+	//Arduino code:
+	//digitalWrite(outPin, LOW);
+
+	//ESP-IDF code:
+	esp_err_t err = gpio_set_level((gpio_num_t)outPin, LOW);
 	if (err != ESP_OK) {
 		ESP_LOGE("OpenTherm", "Error gpio: %s", esp_err_to_name(err));
 	}
-	// digitalWrite(outPin, LOW);
 }
 
 void OpenTherm::setIdleState() {
-	esp_err_t err = gpio_set_level((gpio_num_t)outPin, 1);
+	//Arduino code:
+	// digitalWrite(outPin, HIGH);
+
+	//ESP-IDF code:
+	esp_err_t err = gpio_set_level((gpio_num_t)outPin, HIGH);
 	if (err != ESP_OK) {
 		ESP_LOGE("OpenTherm", "Error gpio: %s", esp_err_to_name(err));
 	}
-	// digitalWrite(outPin, HIGH);
 }
 
 void OpenTherm::activateBoiler() {
 	setIdleState();
+	//Arduino code:
+	//delay(1000);
+
+	//ESP-IDF code:
 	vTaskDelay(1000);
 }
 
@@ -142,21 +170,40 @@ void OpenTherm::sendBit(bool high) {
 		setActiveState();
 	else
 		setIdleState();
+
+	//Arduino code:
+	//delayMicroseconds(500);
+
+	//ESP-IDF code:
 	ets_delay_us(500);
+
 	if (high)
 		setIdleState();
 	else
 		setActiveState();
+
+	//Arduino code:
+	//delayMicroseconds(500);
+
+	//ESP-IDF code:
 	ets_delay_us(500);
 }
 
 bool OpenTherm::sendRequestAync(unsigned long request) {
 	//Serial.println("Request: " + String(request, HEX));
+	//Arduino code:
 	// noInterrupts();
+
+	//ESP-IDF code:
 	gpio_intr_disable((gpio_num_t)inPin);
+
 	const bool ready = isReady();
+	//Arduino code:
 	// interrupts();
+
+	//ESP-IDF code:
 	gpio_intr_enable((gpio_num_t)inPin);
+
 	if (!ready)
 		return false;
 
@@ -164,18 +211,20 @@ bool OpenTherm::sendRequestAync(unsigned long request) {
 	response = 0;
 	responseStatus = OpenThermResponseStatus::NONE;
 
-	uint64_t request_bytes = (1LLU << request);
-	sendBit(1); //start bit
-	uint64_t bitCount = (1U << 1);
+	sendBit(HIGH); //start bit
+	std::bitset<32> request_bitset(request);
 	for (int i = 31; i >= 0; i--) {
-		bool read_bit = (bool)(request_bytes & bitCount);
-		sendBit(read_bit);
-		bitCount *= 2;
+		sendBit(request_bitset[i]);
 	}
-	sendBit(1); //stop bit
+	sendBit(HIGH); //stop bit
 	setIdleState();
 
 	status = OpenThermStatus::RESPONSE_WAITING;
+
+	//Arduino code:
+	// responseTimestamp = micros();
+
+	//ESP-IDF code:
 	responseTimestamp = esp_timer_get_time();
 	return true;
 }
@@ -195,14 +244,12 @@ bool OpenTherm::sendResponse(unsigned long request) {
 	response = 0;
 	responseStatus = OpenThermResponseStatus::NONE;
 
-	uint64_t request_bytes = (1LLU << request);
-	sendBit(1); //start bit
-	uint64_t bitCount = (1U << 1);
+	sendBit(HIGH); //start bit
+	std::bitset<32> request_bitset(request);
 	for (int i = 31; i >= 0; i--) {
-		bool read_bit = (bool)(request_bytes & bitCount);
-		sendBit(read_bit);
-		bitCount *= 2;
+		sendBit(request_bitset[i]);
 	}
+	sendBit(HIGH); //stop bit
 	setIdleState();
 	status = OpenThermStatus::READY;
 	return true;
@@ -213,9 +260,9 @@ OpenThermResponseStatus OpenTherm::getLastResponseStatus() {
 }
 
 void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
-	esp_task_wdt_reset();
+	esp_task_wdt_reset(); //added by Kevin for ESP-IDF code
 	if (isReady()) {
-		if (isSlave && readState() == 1) {
+		if (isSlave && readState() == HIGH) {
 			status = OpenThermStatus::RESPONSE_WAITING;
 		}
 		else {
@@ -234,9 +281,11 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 		}
 	}
 	else if (status == OpenThermStatus::RESPONSE_START_BIT) {
-		float diff = float ((newTs - responseTimestamp))/1000000;
-		ESP_LOGI(TAG, "Time to response start bit: %.2f s", diff);
-		if ((newTs - responseTimestamp < 750) && readState() == 0) {
+		if (readState() == LOW) {
+			float diff = float ((newTs - responseTimestamp))/1000000;
+			ESP_LOGI(TAG, "Time to response start bit: %.2f s", diff);
+		}
+		if ((newTs - responseTimestamp < 750) && readState() == LOW) {
 			status = OpenThermStatus::RESPONSE_RECEIVING;
 			responseTimestamp = newTs;
 			responseBitIndex = 0;
@@ -259,7 +308,7 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 			}
 		}
 	}
-	return;
+	return; //Arduino code does NOT return
 }
 
 void OpenTherm::process() {
@@ -303,7 +352,7 @@ void OpenTherm::process() {
 
 bool OpenTherm::parity(unsigned long frame) //odd parity
 {
-	char p = 0;
+	uint8_t p = 0;
 	while (frame > 0) {
 		if (frame & 1)
 			p++;
@@ -344,22 +393,25 @@ unsigned long OpenTherm::buildResponse(OpenThermMessageType type, OpenThermMessa
 bool OpenTherm::isValidResponse(unsigned long response) {
 	if (parity(response))
 		return false;
-	uint64_t msgType = (response << 1) >> 29;
+	uint8_t msgType = (response << 1) >> 29;
 	return msgType == READ_ACK || msgType == WRITE_ACK;
 }
 
 bool OpenTherm::isValidRequest(unsigned long request) {
 	if (parity(request))
 		return false;
-	char msgType = (request << 1) >> 29;
+	uint8_t msgType = (request << 1) >> 29;
 	return msgType == READ_DATA || msgType == WRITE_DATA;
 }
 
 void OpenTherm::end() {
 	if (this->handleInterruptCallback != NULL) {
+		// Arduino code:
+		// detachInterrupt(digitalPinToInterrupt(inPin));
+
+		// ESP-IDF code:
 		gpio_isr_handler_remove((gpio_num_t)inPin);
 		gpio_intr_disable((gpio_num_t)inPin);
-		// detachInterrupt(digitalPinToInterrupt(inPin));
 	}
 }
 

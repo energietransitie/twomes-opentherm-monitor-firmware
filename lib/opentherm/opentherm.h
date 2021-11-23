@@ -1,14 +1,3 @@
-/*
-OpenTherm.h - OpenTherm Library for the ESP8266/Arduino platform
-https://github.com/ihormelnyk/OpenTherm
-http://ihormelnyk.com/pages/OpenTherm
-Licensed under MIT license
-Copyright 2018, Ihor Melnyk
-
-Frame Structure:
-P MGS-TYPE SPARE DATA-ID  DATA-VALUE
-0 000      0000  00000000 00000000 00000000
-*/
 #ifndef OPENTHERM_H
 #define OPENTHERM_H
 
@@ -17,6 +6,11 @@ extern "C" {
 }
 
 #include <stdint.h>
+
+#define HIGH 1 // Arduino.h: #define HIGH 0x1
+#define LOW  0 // Arduino.h: #define LOW  0x0
+
+//ESP-IDF includes
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
@@ -51,17 +45,17 @@ enum OpenThermResponseStatus {
 
 enum OpenThermMessageType {
 	/*  Master to Slave */
-	READ_DATA = 0x000,
+	READ_DATA = 0b000,
 	READ = READ_DATA, // for backwared compatibility
-	WRITE_DATA = 0x001,
+	WRITE_DATA = 0b001,
 	WRITE = WRITE_DATA, // for backwared compatibility
-	INVALID_DATA = 0x010,
-	RESERVED = 0x011,
+	INVALID_DATA = 0b010,
+	RESERVED = 0b011,
 	/* Slave to Master */
-	READ_ACK = 0x100,
-	WRITE_ACK = 0x101,
-	DATA_INVALID = 0x110,
-	UNKNOWN_DATA_ID = 0x111
+	READ_ACK = 0b100,
+	WRITE_ACK = 0b101,
+	DATA_INVALID = 0b110,
+	UNKNOWN_DATA_ID = 0b111
 };
 
 typedef OpenThermMessageType OpenThermRequestType; // for backwared compatibility
@@ -136,6 +130,7 @@ enum OpenThermStatus {
 };
 
 void start_opentherm_interrupt_handling();
+void intialize_opentherm_gpio();
 
 class OpenTherm {
 public:
@@ -197,7 +192,7 @@ private:
 	volatile unsigned long response;
 	volatile OpenThermResponseStatus responseStatus;
 	volatile unsigned long responseTimestamp;
-	volatile char responseBitIndex;
+	volatile uint8_t responseBitIndex;
 
 	int readState();
 	void setActiveState();

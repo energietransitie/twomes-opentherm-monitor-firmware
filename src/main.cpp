@@ -388,29 +388,6 @@ void intialize_button_and_led_gpio() {
 
 }
 
-void intialize_opentherm_gpio() {
-    ESP_LOGD(TAG, "starting initialize_opentherm_gpio();");
-
-    gpio_config_t io_conf;
-    //CONFIGURE OUTPUTS:
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = OPENTHERM_OUTPUT_BITMASK;
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-    //CONFIGURE INPUTS:
-    io_conf.intr_type = GPIO_INTR_ANYEDGE;
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = OPENTHERM_INPUT_BITMASK;
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-    ESP_LOGD(TAG, "exiting initialize_opentherm_gpio()");
-}
-
-
 void begin_opentherm() {
 
     ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
@@ -695,7 +672,7 @@ void app_main()
     ESP_LOGD(TAG, "calling initialize_intialize_button_and_led_gpio_gpio()");
     intialize_button_and_led_gpio();
 
-    ESP_LOGD(TAG, "calling initialize_opentherm_gpio()");
+    ESP_LOGD(TAG, "calling intialize_opentherm_gpio()");
     intialize_opentherm_gpio();
 
     twomes_device_provisioning(DEVICE_TYPE_NAME);

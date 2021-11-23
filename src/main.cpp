@@ -176,19 +176,19 @@ void initialize_opentherm_timer(timer_group_t group, timer_idx_t timer, bool aut
     timer_start(group, timer);
 }
 
-void processSlaveRequest(unsigned long response, OpenThermResponseStatus status) {
+void processSlaveRequest(unsigned long frame, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Response from boiler: %lX", response);
+    ESP_LOGD(TAG, "Data frame from boiler: %lX", frame);
     char data[10];
-    sprintf(data, "B%lX", response); //TODO: check if storing as 8-character hexadecimal is ok
+    sprintf(data, "B%lX", frame); 
     strcpy(dataBufferSlave[bufferSlaveCount++], data);
 }
 
-void processMasterRequest(unsigned long request, OpenThermResponseStatus status) {
+void processMasterRequest(unsigned long frame, OpenThermResponseStatus status) {
     //TODO: ESP_LOGD cannot be used from an interrupt
-    ESP_LOGD(TAG, "Request from thermostat: %lX", request);
+    ESP_LOGD(TAG, "Data frame from thermostat: %lX", frame);
     char data[10];
-    sprintf(data, "T%lX", request); //TODO: check if storing as 8-character hexadecimal is ok
+    sprintf(data, "T%lX", frame); 
     strcpy(dataBufferMaster[bufferMasterCount++], data);
 }
 
@@ -390,6 +390,9 @@ void intialize_button_and_led_gpio() {
 
 void begin_opentherm() {
 
+    ESP_LOGD(TAG, "calling start_opentherm_interrupts_handling()");
+    start_opentherm_interrupt_handling();
+
     ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
     initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
 
@@ -399,8 +402,6 @@ void begin_opentherm() {
     sOT.begin(sHandleInterrupt, processSlaveRequest);
     ESP_LOGD(TAG, "starting main OpenTherm processing loop");
 
-    ESP_LOGD(TAG, "calling start_opentherm_interrupts_handling()");
-    start_opentherm_interrupt_handling();
     
 }
 
@@ -669,6 +670,8 @@ extern "C" {
 
 void app_main()
 {
+	gpio_install_isr_service(0);
+
     ESP_LOGD(TAG, "calling initialize_intialize_button_and_led_gpio_gpio()");
     intialize_button_and_led_gpio();
 

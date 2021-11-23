@@ -4,7 +4,7 @@
 static xQueueHandle opentherm_gpio_evt_queue = NULL;
 static const char *TAG = "Twomes OpenTherm Library ESP32";
 
-//Gpio ISR handler for OpenTherm library: // TODO: check whether this does not clash with main ISR handler
+//Gpio ISR handler for OpenTherm library: 
 static void IRAM_ATTR opentherm_gpio_isr_handler(void *arg) {
 	uint32_t gpio_num = (uint32_t)arg;
 	xQueueSendFromISR(opentherm_gpio_evt_queue, &gpio_num, NULL);
@@ -80,8 +80,7 @@ void intialize_opentherm_gpio() {
 
 void start_opentherm_interrupt_handling() {
 	opentherm_gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-	xTaskCreatePinnedToCore(openthermInterruptHandler, "handle_opentehrm_interrups", 2048, NULL, 10, NULL, 1);
-	gpio_install_isr_service(0);
+	xTaskCreatePinnedToCore(openthermInterruptHandler, "handle_opentherm_interrupts", 2048, NULL, 10, NULL, 1);
 	gpio_isr_handler_add(WIFI_RESET_BUTTON_GPIO16_SW1, opentherm_gpio_isr_handler, (void *)WIFI_RESET_BUTTON_GPIO16_SW1);
 }
 
@@ -103,14 +102,13 @@ void OpenTherm::begin(void (*handleInterruptCallback)(void *), void (*processRes
 		//pinMode(outPin, OUTPUT);
 
 		//ESP-IDF code:
-		//set gpio configuration in  
+		//set gpio configuration in 
 	if (handleInterruptCallback != NULL) {
 		this->handleInterruptCallback = handleInterruptCallback;
 		//Arduino code:
 		//attachInterrupt(digitalPinToInterrupt(inPin), handleInterruptCallback, CHANGE);
 
 		//ESP-IDF code:
-		gpio_install_isr_service(0);
 		gpio_isr_handler_add((gpio_num_t)inPin, opentherm_gpio_isr_handler, (void *)inPin);
 
 	}
@@ -301,9 +299,11 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 				response = (response << 1) | !readState();
 				responseTimestamp = newTs;
 				responseBitIndex++;
+				ESP_LOGD(TAG, "RESPONSE_RECEIVING: %lX", response);
 			}
 			else { //stop bit
 				status = OpenThermStatus::RESPONSE_READY;
+				ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 				responseTimestamp = newTs;
 			}
 		}
@@ -323,6 +323,7 @@ void OpenTherm::process() {
 		return;
 	unsigned long newTs = esp_timer_get_time();
 	if (st != OpenThermStatus::NOT_INITIALIZED && (newTs - ts) > 1000000) {
+		ESP_LOGD(TAG, "RESPONSE_TIMEOUT: %lX", response);
 		status = OpenThermStatus::READY;
 		responseStatus = OpenThermResponseStatus::TIMEOUT;
 		if (processResponseCallback != NULL) {
@@ -330,6 +331,7 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::RESPONSE_INVALID) {
+		ESP_LOGD(TAG, "RESPONSE_INVALID: %lX", response);
 		status = OpenThermStatus::DELAY;
 		responseStatus = OpenThermResponseStatus::INVALID;
 		if (processResponseCallback != NULL) {
@@ -337,6 +339,7 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::RESPONSE_READY) {
+		ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 		status = OpenThermStatus::DELAY;
 		responseStatus = (isSlave ? isValidRequest(response) : isValidResponse(response)) ? OpenThermResponseStatus::SUCCESS : OpenThermResponseStatus::INVALID;
 		if (processResponseCallback != NULL) {
@@ -344,8 +347,10 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::DELAY) {
+		ESP_LOGD(TAG, "RESPONSE_DELAY: %lX", response);
 		if ((newTs - ts) > 100000) {
 			status = OpenThermStatus::READY;
+			ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 		}
 	}
 }

@@ -269,9 +269,12 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 	}
 
 	unsigned long newTs = esp_timer_get_time();
+
 	if (status == OpenThermStatus::RESPONSE_WAITING) {
 		if (readState() == HIGH) {
 			status = OpenThermStatus::RESPONSE_START_BIT;
+			responseTimestamp = newTs;
+	//		ESP_LOGD(TAG, "RESPONSE_STARTBIT");
 		}
 		else {
 			status = OpenThermStatus::RESPONSE_INVALID;
@@ -279,10 +282,10 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 		}
 	}
 	else if (status == OpenThermStatus::RESPONSE_START_BIT) {
-		if (readState() == LOW) {
-			float diff = float ((newTs - responseTimestamp))/1000000;
-			ESP_LOGI(TAG, "Time to response start bit: %.2f s", diff);
-		}
+		/*if (readState() == LOW) {
+			float diff = float ((newTs - responseTimestamp))/1000;
+			ESP_LOGI(TAG, "Time to response start bit: %.2f ms", diff);
+		}*/
 		if ((newTs - responseTimestamp < 750) && readState() == LOW) {
 			status = OpenThermStatus::RESPONSE_RECEIVING;
 			responseTimestamp = newTs;
@@ -299,11 +302,11 @@ void ICACHE_RAM_ATTR OpenTherm::handleInterrupt(void *) {
 				response = (response << 1) | !readState();
 				responseTimestamp = newTs;
 				responseBitIndex++;
-				ESP_LOGD(TAG, "RESPONSE_RECEIVING: %lX", response);
+	//			ESP_LOGD(TAG, "RESPONSE_RECEIVING: %lX", response);
 			}
 			else { //stop bit
 				status = OpenThermStatus::RESPONSE_READY;
-				ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
+	//			ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 				responseTimestamp = newTs;
 			}
 		}

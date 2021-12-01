@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "opentherm.h"
 #include "driver/timer.h"
+#include <cmath>
 
 #define BOOT_STARTUP_INTERVAL_MS (10 * 1000) // milliseconds ( 10 s * 1000 ms/s)
 #define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
@@ -31,15 +32,15 @@ const int mOutPin = MASTER_OUT_PIN_GPIO26; //not conected
 const int sInPin = SLAVE_IN_PIN_GPIO21;
 const int sOutPin = SLAVE_OUT_PIN_GPIO23; //not connected
 
-#define BOILER_MEASUREMENT_INTERVAL 10
-#define ROOM_TEMP_MEASUREMENT_INTERVAL 300
-#define REGULAR_MEASUREMENT_INTERVAL 30
-#define OPENTHERM_UPLOAD_INTERVAL 900
+#define BOILER_MEASUREMENT_INTERVAL_S       10    // seconds
+#define ROOM_TEMP_MEASUREMENT_INTERVAL_S    300   // seconds (5 min * 60 s/min)
+#define REGULAR_MEASUREMENT_INTERVAL        30    // seconds
+// #define OPENTHERM_UPLOAD_INTERVAL           900   // seconds (15 min * 60 s/min )
 #define FLOAT_STRING_LENGTH 7
-#define BOILER_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / BOILER_MEASUREMENT_INTERVAL
+#define BOILER_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / BOILER_MEASUREMENT_INTERVAL_S
 int boiler_measurement_count = 0;
 
-#define ROOM_TEMPERATURE_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / ROOM_TEMP_MEASUREMENT_INTERVAL
+#define ROOM_TEMPERATURE_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / ROOM_TEMP_MEASUREMENT_INTERVAL_S
 int room_temp_count = 0;
 
 #define REGULAR_MEASUREMENT_MAX OPENTHERM_UPLOAD_INTERVAL / REGULAR_MEASUREMENT_INTERVAL
@@ -48,32 +49,32 @@ int regular_measurement_count = 0;
 #define TIMER_DIVIDER 80
 
 // in-memory buffers for interpreted values
-int ch_mode_data[REGULAR_MEASUREMENT_MAX];                                 // Central heating mode (ON/OFF)
-int dhw_mode_data[REGULAR_MEASUREMENT_MAX];                                // Domestic hot water mode (ON/OFF)
-int flame_data[REGULAR_MEASUREMENT_MAX];                                   // Burner status (ON/OFF)
-char roomSetpoint_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Room temperature setpoint
-char roomTemp_data[ROOM_TEMPERATURE_MEASUREMENT_MAX][FLOAT_STRING_LENGTH]; // Current room temperature
-char boilerTemp_data[BOILER_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Boiler water temperature
-char returnTemp_data[BOILER_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Return water temperature
-char maxRelModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Maximum relative modulation level
-int minModLvl_data[REGULAR_MEASUREMENT_MAX];                               // Minimum modulation level
-char relModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Relative modulation level
-int maxBoilerCapStorage_data[REGULAR_MEASUREMENT_MAX];                     // Maximum boiler capacity
+// int ch_mode_data[REGULAR_MEASUREMENT_MAX];                                 // Central heating mode (ON/OFF)
+// int dhw_mode_data[REGULAR_MEASUREMENT_MAX];                                // Domestic hot water mode (ON/OFF)
+// int flame_data[REGULAR_MEASUREMENT_MAX];                                   // Burner status (ON/OFF)
+// char roomSetpoint_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Room temperature setpoint
+// char roomTemp_data[ROOM_TEMPERATURE_MEASUREMENT_MAX][FLOAT_STRING_LENGTH]; // Current room temperature
+// char boilerTemp_data[BOILER_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Boiler water temperature
+// char returnTemp_data[BOILER_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Return water temperature
+// char maxRelModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];      // Maximum relative modulation level
+// int minModLvl_data[REGULAR_MEASUREMENT_MAX];                               // Minimum modulation level
+// char relModLvl_data[REGULAR_MEASUREMENT_MAX][FLOAT_STRING_LENGTH];         // Relative modulation level
+// int maxBoilerCapStorage_data[REGULAR_MEASUREMENT_MAX];                     // Maximum boiler capacity
 
 OpenTherm mOT(mInPin, mOutPin);
 OpenTherm sOT(sInPin, sOutPin, true);
 
-int ch_mode = 0;                // Central heating mode (ON/OFF)
-int dhw_mode = 0;               // Domestic hot water mode (ON/OFF)
-int flame = 0;                  // Burner status (ON/OFF)
-char roomSetpoint[7];           // Room temperature setpoint
-char roomTemp[7];               // Current room temperature
-char boilerTemp[7];             // Boiler water temperature
-char returnTemp[7];             // Return water temperature
-char maxRelModLvl[7];           // Maximum relative modulation level
-int minModLvl = 0;              // Minimum modulation level
-char relModLvl[3];              // Relative modulation level
-int maxBoilerCap = 0;           // Maximum boiler capacity
+int ch_mode = -1 ;                          // Central heating mode (ON/OFF)
+int dhw_mode = -1;                          // Domestic hot water mode (ON/OFF)
+int flame = -1;                             // Burner status (ON/OFF)
+char roomSetpoint[FLOAT_STRING_LENGTH];     // Room temperature setpoint
+char roomTemp[FLOAT_STRING_LENGTH];         // Current room temperature
+char boilerTemp[FLOAT_STRING_LENGTH];       // Boiler water temperature
+char returnTemp[FLOAT_STRING_LENGTH];       // Return water temperature
+int maxRelModLvl = -1;                      // Maximum relative modulation level
+int minModLvl = -1;                         // Minimum modulation level
+int relModLvl = -1;                         // Relative modulation level
+int maxBoilerCap = -1;                      // Maximum boiler capacity
 
 // const char *ch_mode_name = "chmode";
 // const char *dhw_mode_name = "dhwmode";
@@ -265,7 +266,7 @@ void processSendRequest(char data[9]) {
 
         // Bitwise compare with 00000010 (2) to get bit number 2. The result is either 2 or 0.
         ch_mode = ((lowbyte & 2) == 2) ? 1 : 0;
-
+        
         // Bitwise compare with 00000100 (4) to get bit number 3. The result is either 4 or 0.
         dhw_mode = ((lowbyte & 4) == 4) ? 1 : 0;
 
@@ -291,27 +292,27 @@ void processSendRequest(char data[9]) {
         // Format the floating point value to a string with 6 characters using 2 decimals
         switch (dataId) {
             case 14:
-                sprintf(maxRelModLvl, "%.0f", tmp); // TODO: relax the 6 character demand; make this dynamic?
-                ESP_LOGD(TAG, "Processing maxRelModLvl %s", maxRelModLvl);
+                maxRelModLvl = (int) round(tmp);
+                ESP_LOGD(TAG, "Processing maxRelModLvl %i", maxRelModLvl);
                 break;
             case 16:
-                sprintf(roomSetpoint, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(roomSetpoint, "%.2f", tmp);
                 ESP_LOGD(TAG, "Processing roomSetpoint %s", roomSetpoint);
                 break;
             case 17:
-                sprintf(relModLvl, "%.0f", tmp); // TODO: relax the 6 character demand; make this dynamic?
-                ESP_LOGD(TAG, "Processing relModLvl %s", relModLvl);
+                relModLvl = (int) round(tmp);
+                ESP_LOGD(TAG, "Processing relModLvl %i", relModLvl);
                 break;
             case 24:
-                sprintf(roomTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(roomTemp, "%.2f", tmp);
                 ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
                 break;
             case 25:
-                sprintf(boilerTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(boilerTemp, "%.2f", tmp);
                 ESP_LOGD(TAG, "Processing boilerTemp %s", boilerTemp);
                 break;
             case 28:
-                sprintf(returnTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(returnTemp, "%.2f", tmp);
                 ESP_LOGD(TAG, "Processing returnTemp %s", returnTemp);
                 break;
             default:
@@ -522,95 +523,108 @@ void begin_opentherm() {
 // }
 
 //WIP Will be radically different later
-void upload_data() {
-    std::string room_temp_str("");
-    std::string return_temp_str("");
-    std::string boiler_temp_str("");
-    std::string ch_mode_str("");
-    std::string dhw_mode_str("");
-    std::string flame_str("");
-    std::string room_set_point_str("");
-    std::string max_rel_mod_lvl_str("");
-    std::string min_mod_lvl_str("");
-    std::string rel_mod_lvl_str("");
-    std::string max_boiler_cap_str("");
-    for (int i = 0; i < regular_measurement_count; i++) {
-        if (i) {
-            ch_mode_str.append(",");
-            dhw_mode_str.append(",");
-            flame_str.append(",");
-            room_set_point_str.append(",");
-            max_rel_mod_lvl_str.append(",");
-            min_mod_lvl_str.append(",");
-            min_mod_lvl_str.append(",");
-            max_boiler_cap_str.append(",");
-        }
-        ch_mode_str.append(std::to_string(ch_mode_data[i]));
-        dhw_mode_str.append(std::to_string(dhw_mode_data[i]));
-        flame_str.append(std::to_string(flame_data[i]));
-        room_set_point_str.append(roomSetpoint_data[i]);
-        max_rel_mod_lvl_str.append(maxRelModLvl_data[i]);
-        min_mod_lvl_str.append(std::to_string(minModLvl_data[i]));
-        min_mod_lvl_str.append(relModLvl_data[i]);
-        max_boiler_cap_str.append(std::to_string(maxBoilerCapStorage_data[i]));
-    }
-    for (int i = 0; i < room_temp_count; i++) {
-        if (i) {
-            room_temp_str += std::string(", ") + std::string(roomTemp_data[i]);
-        }
-        else {
-            room_temp_str += std::string(roomTemp_data[i]);
-        }
-    }
-    for (int i = 0; i < boiler_measurement_count; i++) {
-        if (i) {
-            boiler_temp_str += std::string(", ") + std::string(boilerTemp_data[i]);
-            return_temp_str += std::string(", ") + std::string(returnTemp_data[i]);
-        }
-        else {
-            boiler_temp_str += boilerTemp_data[i];
-            return_temp_str += returnTemp_data[i];
-        }
-    }
-    ESP_LOGD(TAG, "Temp Data: %s\n", room_temp_str.c_str());
-    ESP_LOGD(TAG, "Boiler Temp: %s\n", boiler_temp_str.c_str());
-    ESP_LOGD(TAG, "Return Temp: %s\n", return_temp_str.c_str());
-    ESP_LOGD(TAG, "CH_MODE: %s\n", ch_mode_str.c_str());
-    ESP_LOGD(TAG, "DHW_MODE: %s\n", dhw_mode_str.c_str());
-    ESP_LOGD(TAG, "flame: %s\n", flame_str.c_str());
-    ESP_LOGD(TAG, "room_set_point: %s\n", room_set_point_str.c_str());
-    ESP_LOGD(TAG, "max_rel: %s\n", max_rel_mod_lvl_str.c_str());
-    ESP_LOGD(TAG, "min_mod: %s\n", min_mod_lvl_str.c_str());
-    ESP_LOGD(TAG, "rel_mod: %s\n", rel_mod_lvl_str.c_str());
-    ESP_LOGD(TAG, "boiler cap: %s\n", max_boiler_cap_str.c_str());
-}
+// void upload_data() {
+//     std::string room_temp_str("");
+//     std::string return_temp_str("");
+//     std::string boiler_temp_str("");
+//     std::string ch_mode_str("");
+//     std::string dhw_mode_str("");
+//     std::string flame_str("");
+//     std::string room_set_point_str("");
+//     std::string max_rel_mod_lvl_str("");
+//     std::string min_mod_lvl_str("");
+//     std::string rel_mod_lvl_str("");
+//     std::string max_boiler_cap_str("");
+//     for (int i = 0; i < regular_measurement_count; i++) {
+//         if (i) {
+//             ch_mode_str.append(",");
+//             dhw_mode_str.append(",");
+//             flame_str.append(",");
+//             room_set_point_str.append(",");
+//             max_rel_mod_lvl_str.append(",");
+//             min_mod_lvl_str.append(",");
+//             min_mod_lvl_str.append(",");
+//             max_boiler_cap_str.append(",");
+//         }
+//         ch_mode_str.append(std::to_string(ch_mode_data[i]));
+//         dhw_mode_str.append(std::to_string(dhw_mode_data[i]));
+//         flame_str.append(std::to_string(flame_data[i]));
+//         room_set_point_str.append(roomSetpoint_data[i]);
+//         max_rel_mod_lvl_str.append(maxRelModLvl_data[i]);
+//         min_mod_lvl_str.append(std::to_string(minModLvl_data[i]));
+//         min_mod_lvl_str.append(relModLvl_data[i]);
+//         max_boiler_cap_str.append(std::to_string(maxBoilerCapStorage_data[i]));
+//     }
+//     for (int i = 0; i < room_temp_count; i++) {
+//         if (i) {
+//             room_temp_str += std::string(", ") + std::string(roomTemp_data[i]);
+//         }
+//         else {
+//             room_temp_str += std::string(roomTemp_data[i]);
+//         }
+//     }
+//     for (int i = 0; i < boiler_measurement_count; i++) {
+//         if (i) {
+//             boiler_temp_str += std::string(", ") + std::string(boilerTemp_data[i]);
+//             return_temp_str += std::string(", ") + std::string(returnTemp_data[i]);
+//         }
+//         else {
+//             boiler_temp_str += boilerTemp_data[i];
+//             return_temp_str += returnTemp_data[i];
+//         }
+//     }
+//     ESP_LOGD(TAG, "Temp Data: %s\n", room_temp_str.c_str());
+//     ESP_LOGD(TAG, "Boiler Temp: %s\n", boiler_temp_str.c_str());
+//     ESP_LOGD(TAG, "Return Temp: %s\n", return_temp_str.c_str());
+//     ESP_LOGD(TAG, "CH_MODE: %s\n", ch_mode_str.c_str());
+//     ESP_LOGD(TAG, "DHW_MODE: %s\n", dhw_mode_str.c_str());
+//     ESP_LOGD(TAG, "flame: %s\n", flame_str.c_str());
+//     ESP_LOGD(TAG, "room_set_point: %s\n", room_set_point_str.c_str());
+//     ESP_LOGD(TAG, "max_rel: %s\n", max_rel_mod_lvl_str.c_str());
+//     ESP_LOGD(TAG, "min_mod: %s\n", min_mod_lvl_str.c_str());
+//     ESP_LOGD(TAG, "rel_mod: %s\n", rel_mod_lvl_str.c_str());
+//     ESP_LOGD(TAG, "boiler cap: %s\n", max_boiler_cap_str.c_str());
+// }
 
 char *get_property_string_char(const char *prop_name, uint32_t time, char *value) {
-    char property_string_char[] = "{\"property_name\": \"%s\","
-        "\"measurements\": ["
-        "{ \"timestamp\":\"%d\","
-        "\"value\":\"%s\"}]}";
+    
+    if (value == NULL or value[0]=='\0') {
+         char *empty_str = (char *)malloc(1);
+         empty_str[0] = '\0';
+         return empty_str;
+    } else {
+        char property_string_char[] = "{\"property_name\": \"%s\","
+            "\"measurements\": ["
+            "{ \"timestamp\":\"%d\","
+            "\"value\":\"%s\"}]}";
 
-    int property_size = variable_sprintf_size(property_string_char, 3, prop_name, time, value);
-    //Allocating enough memory so inputting the variables into the string doesn't overflow
-    char *property_str = (char *)malloc(property_size);
-    //Inputting variables into the plain json string from above(msgPlain).
-    snprintf(property_str, property_size, property_string_char, prop_name, time, value);
-    return property_str;
+        int property_size = variable_sprintf_size(property_string_char, 3, prop_name, time, value);
+        //Allocating enough memory so inputting the variables into the string doesn't overflow
+        char *property_str = (char *)malloc(property_size);
+        //Inputting variables into the plain json string from above(msgPlain).
+        snprintf(property_str, property_size, property_string_char, prop_name, time, value);
+        return property_str;
+    }
 }
 
 char *get_property_string_integer(const char *prop_name, uint32_t time, int value) {
-    char property_string_integer[] = "{\"property_name\": \"%s\","
-        "\"measurements\": ["
-        "{ \"timestamp\":\"%d\","
-        "\"value\":\"%d\"}]}";
+    if (value == -1) {
+         char *empty_str = (char *)malloc(1);
+         empty_str[0] = '\0';
+         return empty_str;
+    } else {
+        char property_string_integer[] = "{\"property_name\": \"%s\","
+            "\"measurements\": ["
+            "{ \"timestamp\":\"%d\","
+            "\"value\":\"%d\"}]}";
 
-    int property_size = variable_sprintf_size(property_string_integer, 3, prop_name, time, value);
-    //Allocating enough memory so inputting the variables into the string doesn't overflow
-    char *property_str = (char *)malloc(property_size);
-    //Inputting variables into the plain json string from above(msgPlain).
-    snprintf(property_str, property_size, property_string_integer, prop_name, time, value);
-    return property_str;
+        int property_size = variable_sprintf_size(property_string_integer, 3, prop_name, time, value);
+        //Allocating enough memory so inputting the variables into the string doesn't overflow
+        char *property_str = (char *)malloc(property_size);
+        //Inputting variables into the plain json string from above(msgPlain).
+        snprintf(property_str, property_size, property_string_integer, prop_name, time, value);
+        return property_str;
+    }
 }
 
 char *get_boiler_measurements_data(uint32_t time) {
@@ -618,7 +632,16 @@ char *get_boiler_measurements_data(uint32_t time) {
     std::string supply_temp_property(get_property_string_char(supply_temp_property_name, time, boilerTemp));
     std::string return_temp_property(get_property_string_char(return_temp_property_name, time, returnTemp));
 
-    std::string combined_properties = supply_temp_property + ", " + return_temp_property;
+    std::string combined_properties = "";
+    if (!supply_temp_property.empty()) {
+        combined_properties = combined_properties + supply_temp_property + ", ";
+    }
+    if (!return_temp_property.empty()) {
+        combined_properties = combined_properties + return_temp_property + ", ";
+    }
+    if (!combined_properties.empty()) {
+        combined_properties = combined_properties.substr(0,combined_properties.size()-2);
+    }
 
     int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
@@ -644,12 +667,39 @@ char *get_regular_measurements_data(uint32_t time) {
     std::string dhw_mode_property(get_property_string_integer(dhw_mode_property_name, time, dhw_mode));
     std::string flame_property(get_property_string_integer(flame_property_name, time, flame));
     std::string room_set_point_property(get_property_string_char(room_set_point_property_name, time, roomSetpoint));
-    std::string max_rel_mod_lvl_property(get_property_string_char(max_rel_mod_lvl_property_name, time, maxRelModLvl));
+    std::string max_rel_mod_lvl_property(get_property_string_integer(max_rel_mod_lvl_property_name, time, maxRelModLvl));
     std::string min_mod_lvl_property(get_property_string_integer(min_mod_lvl_property_name, time, minModLvl));
-    std::string rel_mod_lvl_property(get_property_string_char(rel_mod_lvl_property_name, time, relModLvl));
+    std::string rel_mod_lvl_property(get_property_string_integer(rel_mod_lvl_property_name, time, relModLvl));
     std::string max_boiler_cap_property(get_property_string_integer(max_rel_mod_lvl_property_name, time, maxBoilerCap));
 
-    std::string combined_properties = ch_mode_property + ", " + dhw_mode_property + ", " + flame_property + ", " + room_set_point_property + ", " + max_rel_mod_lvl_property + ", " + min_mod_lvl_property + ", " + rel_mod_lvl_property + ", " + max_boiler_cap_property;
+    std::string combined_properties = "";
+    if (!ch_mode_property.empty()) {
+        combined_properties = combined_properties + ch_mode_property + ", ";
+    }
+    if (!dhw_mode_property.empty()) {
+        combined_properties = combined_properties + dhw_mode_property + ", ";
+    }
+    if (!flame_property.empty()) {
+        combined_properties = combined_properties + flame_property + ", ";
+    }
+    if (!room_set_point_property.empty()) {
+        combined_properties = combined_properties + room_set_point_property + ", ";
+    }
+    if (!max_rel_mod_lvl_property.empty()) {
+        combined_properties = combined_properties + max_rel_mod_lvl_property + ", ";
+    }
+    if (!min_mod_lvl_property.empty()) {
+        combined_properties = combined_properties + min_mod_lvl_property + ", ";
+    }
+    if (!rel_mod_lvl_property.empty()) {
+        combined_properties = combined_properties + rel_mod_lvl_property + ", ";
+    }
+    if (!max_boiler_cap_property.empty()) {
+        combined_properties = combined_properties + max_boiler_cap_property + ", ";
+    }
+    if (!combined_properties.empty()) {
+        combined_properties = combined_properties.substr(0,combined_properties.size()-2);
+    }
 
     int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time, combined_properties.c_str());
     char *msg = (char *)malloc(msgSize);
@@ -728,59 +778,83 @@ void app_main()
             // ESP_LOGD(TAG, "room_temp_timer_count: %d", room_temp_timer_count );
             // ESP_LOGD(TAG, "regular_timer_count: %d", regular_timer_count );
         }
-        if (upload_timer_count >= OPENTHERM_UPLOAD_INTERVAL) {
-            // ESP_LOGE(TAG, "Uploading all buffered data!");
-            // regular_measurement_count = 0;
-            // boiler_measurement_count = 0;
-            // room_temp_count = 0;
-            upload_timer_count = 0;
-        }
+        // if (upload_timer_count >= OPENTHERM_UPLOAD_INTERVAL) {
+        //     // ESP_LOGE(TAG, "Uploading all buffered data!");
+        //     // regular_measurement_count = 0;
+        //     // boiler_measurement_count = 0;
+        //     // room_temp_count = 0;
+        //     upload_timer_count = 0;
+        // }
         //boilerSupplyTemp & boilerReturnTemp timer
-        if (boiler_timer_count >= BOILER_MEASUREMENT_INTERVAL) {
-            ESP_LOGD(TAG, "Measuring and uploading boilerSupplyTemp and boilerReturnTemp");
-            char *msg = get_boiler_measurements_data(time(NULL));
-            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
-            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
-            free(msg);
-            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
-            // strcpy(boilerTemp_data[boiler_measurement_count], boilerTemp);
-            // strcpy(returnTemp_data[boiler_measurement_count], returnTemp);
-            // boiler_measurement_count++;
+        if (boiler_timer_count >= BOILER_MEASUREMENT_INTERVAL_S) {
+            if (boilerTemp[0] == '\0' and returnTemp[0] == '\0') {
+                ESP_LOGD(TAG, "No boilerSupplyTemp and no boilerReturnTemp measured; nothing to upload");
+            } else {
+                ESP_LOGD(TAG, "Measuring and uploading boilerSupplyTemp and boilerReturnTemp");
+                char *msg = get_boiler_measurements_data(time(NULL));
+                upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+                ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+                free(msg);
+                boilerTemp[0] = '\0';
+                returnTemp[0] = '\0';
+                ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
+                // strcpy(boilerTemp_data[boiler_measurement_count], boilerTemp);
+                // strcpy(returnTemp_data[boiler_measurement_count], returnTemp);
+                // boiler_measurement_count++;
+            }
             boiler_timer_count = 0;
         }
-        if (room_temp_timer_count >= ROOM_TEMP_MEASUREMENT_INTERVAL) {
-            ESP_LOGD(TAG, "Measuring and uploading room temp");
-            //Get size of the message after inputting variables.
-            char *room_temp_property = get_property_string_char("roomTemp", time(NULL), roomTemp);
-            int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time(NULL), room_temp_property);
-            //Allocating enough memory so inputting the variables into the string doesn't overflow
-            char *msg = (char *)malloc(msgSize);
-            //Inputting variables into the plain json string from above(msgPlain).
-            snprintf(msg, msgSize, variable_upload_payload_template, time(NULL), room_temp_property);
-            //Posting data over HTTPS, using url, msg and bearer token.
-            ESP_LOGD(TAG, "Data: %s", msg);
-            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
-            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
-            free(msg);
-            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
+        if (room_temp_timer_count >= ROOM_TEMP_MEASUREMENT_INTERVAL_S) {
+            if (roomTemp[0] == '\0') {
+                ESP_LOGD(TAG, "No roomTemp measured; nothing to upload");
+            } else {
+                ESP_LOGD(TAG, "Measuring and uploading room temp");
+                //Get size of the message after inputting variables.
+                char *room_temp_property = get_property_string_char("roomTemp", time(NULL), roomTemp);
+                int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time(NULL), room_temp_property);
+                //Allocating enough memory so inputting the variables into the string doesn't overflow
+                char *msg = (char *)malloc(msgSize);
+                //Inputting variables into the plain json string from above(msgPlain).
+                snprintf(msg, msgSize, variable_upload_payload_template, time(NULL), room_temp_property);
+                //Posting data over HTTPS, using url, msg and bearer token.
+                ESP_LOGD(TAG, "Data: %s", msg);
+                upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+                ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+                free(msg);
+                roomTemp[0] = '\0'; 
+                ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
+            }
             room_temp_timer_count = 0;
         }
         if (regular_timer_count >= REGULAR_MEASUREMENT_INTERVAL) {
-            ESP_LOGD(TAG, "Measuring and uploading regular measurements");
-            char *msg = get_regular_measurements_data(time(NULL));
-            upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
-            ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
-            free(msg);
-            ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
-            // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
-            // memcpy(&dhw_mode_data[regular_measurement_count], &dhw_mode, sizeof(dhw_mode));                    // Domestic hot water mode (ON/OFF)
-            // memcpy(&flame_data[regular_measurement_count], &flame, sizeof(flame));                             // Burner status (ON/OFF)
-            // strcpy(roomSetpoint_data[regular_measurement_count], roomSetpoint);                                // Return water temperature
-            // strcpy(maxRelModLvl_data[regular_measurement_count], maxRelModLvl);                                // Maximum relative modulation level
-            // memcpy(&minModLvl_data[regular_measurement_count], &minModLvl, sizeof(minModLvl));                 // Minimum modulation level
-            // strcpy(relModLvl_data[regular_measurement_count], relModLvl);                                      // Relative modulation level
-            // memcpy(&maxBoilerCapStorage_data[regular_measurement_count], &maxBoilerCap, sizeof(maxBoilerCap)); // Maximum boiler capacity
-            // regular_measurement_count++;
+            if (ch_mode == -1 and dhw_mode == -1 and flame == -1 and roomSetpoint[0] == '\0' and maxRelModLvl == -1 and minModLvl == -1 and relModLvl == -1 and maxBoilerCap == -1) {
+                ESP_LOGD(TAG, "No resular measurements; nothing to upload");
+            } else {
+                ESP_LOGD(TAG, "Measuring and uploading regular measurements");
+                char *msg = get_regular_measurements_data(time(NULL));
+                upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
+                ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
+                free(msg);
+                ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
+                // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
+                // memcpy(&dhw_mode_data[regular_measurement_count], &dhw_mode, sizeof(dhw_mode));                    // Domestic hot water mode (ON/OFF)
+                // memcpy(&flame_data[regular_measurement_count], &flame, sizeof(flame));                             // Burner status (ON/OFF)
+                // strcpy(roomSetpoint_data[regular_measurement_count], roomSetpoint);                                // Return water temperature
+                // strcpy(maxRelModLvl_data[regular_measurement_count], maxRelModLvl);                                // Maximum relative modulation level
+                // memcpy(&minModLvl_data[regular_measurement_count], &minModLvl, sizeof(minModLvl));                 // Minimum modulation level
+                // strcpy(relModLvl_data[regular_measurement_count], relModLvl);                                      // Relative modulation level
+                // memcpy(&maxBoilerCapStorage_data[regular_measurement_count], &maxBoilerCap, sizeof(maxBoilerCap)); // Maximum boiler capacity
+                // regular_measurement_count++;
+
+                ch_mode = -1;
+                dhw_mode = -1;
+                flame = -1;
+                roomSetpoint[0] = '\0';
+                maxRelModLvl = -1;
+                minModLvl = -1;
+                relModLvl = -1;
+                maxBoilerCap = -1;
+            }
             regular_timer_count = 0;
         }
         // ESP_LOGD(TAG, "Upload Timer Count: %d", upload_timer_count);

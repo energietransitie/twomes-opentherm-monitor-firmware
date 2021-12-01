@@ -3,7 +3,7 @@
 #include "opentherm.h"
 #include "driver/timer.h"
 
-#define BOOT_STARTUP_INTERVAL_MS (10 * 60) // milliseconds ( 10 s * 1000 ms/s)
+#define BOOT_STARTUP_INTERVAL_MS (10 * 1000) // milliseconds ( 10 s * 1000 ms/s)
 #define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
 
 #define DEVICE_TYPE_NAME "OpenTherm-Monitor"
@@ -66,13 +66,13 @@ OpenTherm sOT(sInPin, sOutPin, true);
 int ch_mode = 0;                // Central heating mode (ON/OFF)
 int dhw_mode = 0;               // Domestic hot water mode (ON/OFF)
 int flame = 0;                  // Burner status (ON/OFF)
-char roomSetpoint[] = "  0.00"; // Room temperature setpoint
-char roomTemp[] = "  0.00";     // Current room temperature
-char boilerTemp[] = "  0.00";   // Boiler water temperature
-char returnTemp[] = "  0.00";   // Return water temperature
-char maxRelModLvl[] = "  0.00"; // Maximum relative modulation level
+char roomSetpoint[7];           // Room temperature setpoint
+char roomTemp[7];               // Current room temperature
+char boilerTemp[7];             // Boiler water temperature
+char returnTemp[7];             // Return water temperature
+char maxRelModLvl[7];           // Maximum relative modulation level
 int minModLvl = 0;              // Minimum modulation level
-char relModLvl[] = "  0.00";    // Relative modulation level
+char relModLvl[3];              // Relative modulation level
 int maxBoilerCap = 0;           // Maximum boiler capacity
 
 // const char *ch_mode_name = "chmode";
@@ -291,27 +291,27 @@ void processSendRequest(char data[9]) {
         // Format the floating point value to a string with 6 characters using 2 decimals
         switch (dataId) {
             case 14:
-                sprintf(maxRelModLvl, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(maxRelModLvl, "%.0f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing maxRelModLvl %s", maxRelModLvl);
                 break;
             case 16:
-                sprintf(roomSetpoint, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(roomSetpoint, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing roomSetpoint %s", roomSetpoint);
                 break;
             case 17:
-                sprintf(relModLvl, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(relModLvl, "%.0f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing relModLvl %s", relModLvl);
                 break;
             case 24:
-                sprintf(roomTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(roomTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
                 break;
             case 25:
-                sprintf(boilerTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(boilerTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing boilerTemp %s", boilerTemp);
                 break;
             case 28:
-                sprintf(returnTemp, "%6.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
+                sprintf(returnTemp, "%.2f", tmp); // TODO: relax the 6 character demand; make this dynamic?
                 ESP_LOGD(TAG, "Processing returnTemp %s", returnTemp);
                 break;
             default:
@@ -390,13 +390,20 @@ void begin_opentherm() {
     ESP_LOGD(TAG, "calling start_opentherm_interrupts_handling()");
     start_opentherm_interrupt_handling();
 
-    ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
-    initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
+    ESP_LOGD(TAG, "Wating 5 seconds"); 
+    vTaskDelay( (5 * 1000)  / portTICK_PERIOD_MS); // debug purposes
 
     ESP_LOGD(TAG, "calling mOT.begin(mHandleInterrupt, processMasterRequest)");
     mOT.begin(mHandleInterrupt);
     ESP_LOGD(TAG, "sOT.begin(sHandleInterrupt, processSlaveRequest);");
     sOT.begin(sHandleInterrupt, processRequest);
+
+    ESP_LOGD(TAG, "calling initialize_opentherm_timer()");
+    initialize_opentherm_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
+
+    ESP_LOGD(TAG, "Wating 5 seconds"); 
+    vTaskDelay( (5 * 1000)  / portTICK_PERIOD_MS); // debug purposes
+
     ESP_LOGD(TAG, "starting main OpenTherm processing loop");
 
     
@@ -708,10 +715,18 @@ void app_main()
         if (bufferSlaveCount != 0) {
             ESP_LOGD(TAG, "Slave Count: %d", bufferSlaveCount);
             processSendRequest(dataBufferSlave[--bufferSlaveCount]);
+            // ESP_LOGD(TAG, "upload_timer_count: %d", upload_timer_count);
+            // ESP_LOGD(TAG, "boiler_timer_count: %d", boiler_timer_count );
+            // ESP_LOGD(TAG, "room_temp_timer_count: %d", room_temp_timer_count );
+            // ESP_LOGD(TAG, "regular_timer_count: %d", regular_timer_count );
         }
         if (bufferMasterCount != 0) {
             ESP_LOGD(TAG, "Master Count: %d", bufferMasterCount);
             processSendRequest(dataBufferMaster[--bufferMasterCount]);
+            // ESP_LOGD(TAG, "upload_timer_count: %d", upload_timer_count);
+            // ESP_LOGD(TAG, "boiler_timer_count: %d", boiler_timer_count );
+            // ESP_LOGD(TAG, "room_temp_timer_count: %d", room_temp_timer_count );
+            // ESP_LOGD(TAG, "regular_timer_count: %d", regular_timer_count );
         }
         if (upload_timer_count >= OPENTHERM_UPLOAD_INTERVAL) {
             // ESP_LOGE(TAG, "Uploading all buffered data!");
@@ -751,7 +766,7 @@ void app_main()
             room_temp_timer_count = 0;
         }
         if (regular_timer_count >= REGULAR_MEASUREMENT_INTERVAL) {
-            ESP_LOGE(TAG, "Measuring and uploading regular measurements");
+            ESP_LOGD(TAG, "Measuring and uploading regular measurements");
             char *msg = get_regular_measurements_data(time(NULL));
             upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
             ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());

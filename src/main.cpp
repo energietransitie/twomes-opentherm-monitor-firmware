@@ -19,7 +19,8 @@ static const char return_temp_property_name[]       = "boilerReturnTemp";
 static const char ch_mode_property_name[]           = "isCentralHeatingModeOn";
 static const char dhw_mode_property_name[]          = "isDomesticHotWaterModeOn";
 static const char flame_property_name[]             = "isBoilerFlameOn";
-static const char room_set_point_property_name[]    = "roomSetpointTemp";
+static const char room_setpoint_property_name[]     = "roomSetpointTemp";
+static const char room_temp_property_name[]         = "roomTemp";
 static const char max_rel_mod_lvl_property_name[]   = "maxModulationLevel";
 static const char min_mod_lvl_property_name[]       = "minModulationLevel";
 static const char rel_mod_lvl_property_name[]       = "relativeModulationLevel";
@@ -661,12 +662,45 @@ char *get_boiler_measurements_data(uint32_t time) {
     return msg;
 }
 
+char *get_room_measurements_data(uint32_t time) {
+    //Get size of the message after inputting variables.
+    std::string room_setpoint_property(get_property_string_char(room_setpoint_property_name, time, roomSetpoint));
+    std::string room_temp_property(get_property_string_char(room_temp_property_name, time, roomTemp));
+
+    std::string combined_properties = "";
+    if (!room_setpoint_property.empty()) {
+        combined_properties = combined_properties + room_setpoint_property + ", ";
+    }
+    if (!room_temp_property.empty()) {
+        combined_properties = combined_properties + room_temp_property + ", ";
+    }
+    if (!combined_properties.empty()) {
+        combined_properties = combined_properties.substr(0,combined_properties.size()-2);
+    }
+
+    int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time, combined_properties.c_str());
+    char *msg = (char *)malloc(msgSize);
+    snprintf(msg, msgSize, variable_upload_payload_template, time, combined_properties.c_str());
+    ESP_LOGD(TAG, "Data: %s", msg);
+
+    // memcpy(&ch_mode_data[regular_measurement_count], &ch_mode, sizeof(ch_mode));                       // Central heating mode (ON/OFF)
+    // memcpy(&dhw_mode_data[regular_measurement_count], &dhw_mode, sizeof(dhw_mode));                    // Domestic hot water mode (ON/OFF)
+    // memcpy(&flame_data[regular_measurement_count], &flame, sizeof(flame));                             // Burner status (ON/OFF)
+    // strcpy(roomSetpoint_data[regular_measurement_count], roomSetpoint);                                // Return water temperature
+    // strcpy(maxRelModLvl_data[regular_measurement_count], maxRelModLvl);                                // Maximum relative modulation level
+    // memcpy(&minModLvl_data[regular_measurement_count], &minModLvl, sizeof(minModLvl));                 // Minimum modulation level
+    // strcpy(relModLvl_data[regular_measurement_count], relModLvl);                                      // Relative modulation level
+    // memcpy(&maxBoilerCapStorage_data[regular_measurement_count], &maxBoilerCap, sizeof(maxBoilerCap));
+    // free(boiler_temp_property);
+    // free(return_temp_property);
+    return msg;
+}
+
 char *get_regular_measurements_data(uint32_t time) {
     //Get size of the message after inputting variables.
     std::string ch_mode_property(get_property_string_integer(ch_mode_property_name, time, ch_mode));
     std::string dhw_mode_property(get_property_string_integer(dhw_mode_property_name, time, dhw_mode));
     std::string flame_property(get_property_string_integer(flame_property_name, time, flame));
-    std::string room_set_point_property(get_property_string_char(room_set_point_property_name, time, roomSetpoint));
     std::string max_rel_mod_lvl_property(get_property_string_integer(max_rel_mod_lvl_property_name, time, maxRelModLvl));
     std::string min_mod_lvl_property(get_property_string_integer(min_mod_lvl_property_name, time, minModLvl));
     std::string rel_mod_lvl_property(get_property_string_integer(rel_mod_lvl_property_name, time, relModLvl));
@@ -681,9 +715,6 @@ char *get_regular_measurements_data(uint32_t time) {
     }
     if (!flame_property.empty()) {
         combined_properties = combined_properties + flame_property + ", ";
-    }
-    if (!room_set_point_property.empty()) {
-        combined_properties = combined_properties + room_set_point_property + ", ";
     }
     if (!max_rel_mod_lvl_property.empty()) {
         combined_properties = combined_properties + max_rel_mod_lvl_property + ", ";
@@ -805,29 +836,22 @@ void app_main()
             boiler_timer_count = 0;
         }
         if (room_temp_timer_count >= ROOM_TEMP_MEASUREMENT_INTERVAL_S) {
-            if (roomTemp[0] == '\0') {
-                ESP_LOGD(TAG, "No roomTemp measured; nothing to upload");
+            if (roomTemp[0] == '\0' and  roomSetpoint[0] == '\0' ) {
+                ESP_LOGD(TAG, "No roomTemp and no roomSetpoint measured; nothing to upload");
             } else {
-                ESP_LOGD(TAG, "Measuring and uploading room temp");
-                //Get size of the message after inputting variables.
-                char *room_temp_property = get_property_string_char("roomTemp", time(NULL), roomTemp);
-                int msgSize = variable_sprintf_size(variable_upload_payload_template, 2, time(NULL), room_temp_property);
-                //Allocating enough memory so inputting the variables into the string doesn't overflow
-                char *msg = (char *)malloc(msgSize);
-                //Inputting variables into the plain json string from above(msgPlain).
-                snprintf(msg, msgSize, variable_upload_payload_template, time(NULL), room_temp_property);
-                //Posting data over HTTPS, using url, msg and bearer token.
-                ESP_LOGD(TAG, "Data: %s", msg);
+                ESP_LOGD(TAG, "Measuring and uploading roomTemp and roomSetpoint");
+                char *msg = get_room_measurements_data(time(NULL));
                 upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, msg, NULL, 0);
                 ESP_LOGD(TAG, "Free Heap before free(msg): %d", esp_get_free_heap_size());
                 free(msg);
                 roomTemp[0] = '\0'; 
+                roomSetpoint[0] = '\0';
                 ESP_LOGD(TAG, "Free Heap after free(msg): %d", esp_get_free_heap_size());
             }
             room_temp_timer_count = 0;
         }
         if (regular_timer_count >= REGULAR_MEASUREMENT_INTERVAL) {
-            if (ch_mode == -1 and dhw_mode == -1 and flame == -1 and roomSetpoint[0] == '\0' and maxRelModLvl == -1 and minModLvl == -1 and relModLvl == -1 and maxBoilerCap == -1) {
+            if (ch_mode == -1 and dhw_mode == -1 and flame == -1 and maxRelModLvl == -1 and minModLvl == -1 and relModLvl == -1 and maxBoilerCap == -1) {
                 ESP_LOGD(TAG, "No resular measurements; nothing to upload");
             } else {
                 ESP_LOGD(TAG, "Measuring and uploading regular measurements");
@@ -849,7 +873,6 @@ void app_main()
                 ch_mode = -1;
                 dhw_mode = -1;
                 flame = -1;
-                roomSetpoint[0] = '\0';
                 maxRelModLvl = -1;
                 minModLvl = -1;
                 relModLvl = -1;

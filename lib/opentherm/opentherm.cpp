@@ -34,7 +34,7 @@ void openthermInterruptHandler(void *args) {
 					//Button BOOT is (still) pressed
 					vTaskDelay(500 / portTICK_PERIOD_MS); //Wait for 0.5s
 					halfSeconds++;
-					ESP_LOGD(TAG, "Button WIFI_RESET_BUTTON_GPIO16_SW1 has been pressed for %u half-seconds now", halfSeconds);
+					ESP_LOGI(TAG, "Button WIFI_RESET_BUTTON_GPIO16_SW1 has been pressed for %u half-seconds now", halfSeconds);
 					if (halfSeconds >= LONG_BUTTON_PRESS_DURATION) {
 						//Long press on WIFI_RESET_BUTTON_GPIO16_SW1 is for clearing Wi-Fi provisioning memory:
 						ESP_LOGI("ISR", "Long-button press detected on button BOOT; resetting Wi-Fi provisioning and restarting device");
@@ -48,7 +48,7 @@ void openthermInterruptHandler(void *args) {
 					else if (gpio_get_level(WIFI_RESET_BUTTON_GPIO16_SW1)) {
 						//Button WIFI_RESET_BUTTON_GPIO16_SW1 is released
 						//Short press on WIFI_RESET_BUTTON_GPIO16_SW1 not used for anything currently
-						ESP_LOGI("ISR", "Short button press detected on button BOOT");
+						ESP_LOGI("ISR", "Short button press detected on button WIFI_RESET_BUTTON_GPIO16_SW1");
 					}
 				} //while(!gpio_level)
 			}
@@ -326,7 +326,7 @@ void OpenTherm::process() {
 		return;
 	unsigned long newTs = esp_timer_get_time();
 	if (st != OpenThermStatus::NOT_INITIALIZED && (newTs - ts) > 1000000) {
-		ESP_LOGD(TAG, "RESPONSE_TIMEOUT: %lX", response);
+		// ESP_LOGD(TAG, "RESPONSE_TIMEOUT: %lX", response);
 		status = OpenThermStatus::READY;
 		responseStatus = OpenThermResponseStatus::TIMEOUT;
 		if (processResponseCallback != NULL) {
@@ -334,7 +334,7 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::RESPONSE_INVALID) {
-		ESP_LOGD(TAG, "RESPONSE_INVALID: %lX", response);
+		// ESP_LOGD(TAG, "RESPONSE_INVALID: %lX", response);
 		status = OpenThermStatus::DELAY;
 		responseStatus = OpenThermResponseStatus::INVALID;
 		if (processResponseCallback != NULL) {
@@ -342,7 +342,7 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::RESPONSE_READY) {
-		ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
+		// ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 		status = OpenThermStatus::DELAY;
 		responseStatus = (isSlave ? isValidRequest(response) : isValidResponse(response)) ? OpenThermResponseStatus::SUCCESS : OpenThermResponseStatus::INVALID;
 		if (processResponseCallback != NULL) {
@@ -350,10 +350,10 @@ void OpenTherm::process() {
 		}
 	}
 	else if (st == OpenThermStatus::DELAY) {
-		ESP_LOGD(TAG, "RESPONSE_DELAY: %lX", response);
+		// ESP_LOGD(TAG, "RESPONSE_DELAY: %lX", response);
 		if ((newTs - ts) > 100000) {
 			status = OpenThermStatus::READY;
-			ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
+			// ESP_LOGD(TAG, "RESPONSE_READY: %lX", response);
 		}
 	}
 }

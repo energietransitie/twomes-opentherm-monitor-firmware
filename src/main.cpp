@@ -237,21 +237,24 @@ void processSendRequest(char data[9]) {
     // Another option would be to bitwise AND compare it with 01110000 (112) without shifting,
     // and check the result for 01000000 (64 for READ-ACK) or 01010000 (80 for WRITE-ACK)
 
-    // if (msgType == 4 || msgType == 5)
-    // { // Filter on READ-ACK (100 = 4) and WRITE-ACK (101 = 5)
-    ESP_LOGD(TAG, "Processing READ-ACK or WRITE-ACK");
     // The second byte (char 3 and 4 if you don't take into account TBRAE) holds the Data-ID
     strncpy(hex, &data[3], 2);          // Copy 2 chars, starting from 3rd character
     hex[2] = '\0';                      // null-terminated string
     int dataId = strtol(hex, NULL, 16); // Convert hex to dec
 
     // Filter on specific Data ID's
-    // 0 = Slave status (low byte)
-    // 16 = Room Setpoint (f8.8)
-    // 24 = Room Temperature (f8.8)
-    // 25 = Boiler Water Temperature (f8.8)
-    // 28 = Return Water Temperature (f8.8)
-    if (dataId == 0) {
+    // 0 = STATUS (HB: thermostat; LB: boiler)
+    // 14 = CAPACITY SETTING
+    // 15 = MAX CAPACITY / MIN-MOD-LEVEL (HB/LB) [U8/U8]
+    // 16 = ROOM SETPOINT [F8.8]
+    // 24 = ROOM TEMPERATURE [F8.8]
+    // 25 = BOILER WATER TEMP. [F8.8]
+    // 28 = RETURN WATER TEMPERATURE [F8.8]
+    // 54 = MAX CH WATER SETPOINT [F8.8]
+    
+    if (dataId == 0 and (msgType == 4 || msgType == 5)) {
+        // Filter on READ-ACK (100 = 4) and WRITE-ACK (101 = 5)
+
         ESP_LOGD(TAG, "Processing Slave Status");
         // bit : description            [clear/0, set/1]
         // 0   : fault indication       [no fault, fault]
@@ -292,41 +295,55 @@ void processSendRequest(char data[9]) {
 
         float tmp = (float)lng / 256.0; // As the last 8 bits are fractional, divide by 2^8 = 256
 
-        // Format the floating point value to a string with 6 characters using 2 decimals
-        switch (dataId) {
-            case 14:
-                maxRelModLvl = (int) round(tmp);
-                ESP_LOGD(TAG, "Processing maxRelModLvl %i", maxRelModLvl);
-                break;
-            case 16:
-                sprintf(roomSetpoint, "%.2f", tmp);
-                ESP_LOGD(TAG, "Processing roomSetpoint %s", roomSetpoint);
-                break;
-            case 17:
-                relModLvl = (int) round(tmp);
-                ESP_LOGD(TAG, "Processing relModLvl %i", relModLvl);
-                break;
-            case 24:
-                sprintf(roomTemp, "%.2f", tmp);
-                ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
-                break;
-            case 25:
-                sprintf(boilerSupplyTemp, "%.2f", tmp);
-                ESP_LOGD(TAG, "Processing boilerSupplyTemp %s", boilerSupplyTemp);
-                break;
-            case 28:
-                sprintf(boilerReturnTemp, "%.2f", tmp);
-                ESP_LOGD(TAG, "Processing boilerReturnTemp %s", boilerReturnTemp);
-                break;
-            case 57:
-                sprintf(boilerMaxSupplyTemp, "%.2f", tmp);
-                ESP_LOGD(TAG, "Processing boilerMaxSupplyTemp %s", boilerMaxSupplyTemp);
-                break;
-            default:
-                break;
+        if (msgType == 4 || msgType == 5) {
+            // Filter on READ-ACK (100 = 4) and WRITE-ACK (101 = 5)
+            // Register the property value as a floating point string with 2 decimals
+            // or as an integer string for some properties
+            switch (dataId) {
+                case 17:
+                    relModLvl = (int) round(tmp);
+                    ESP_LOGD(TAG, "Processing relModLvl %i", relModLvl);
+                    break;
+                case 25:
+                    sprintf(boilerSupplyTemp, "%.2f", tmp);
+                    ESP_LOGD(TAG, "Processing boilerSupplyTemp %s", boilerSupplyTemp);
+                    break;
+                case 28:
+                    sprintf(boilerReturnTemp, "%.2f", tmp);
+                    ESP_LOGD(TAG, "Processing boilerReturnTemp %s", boilerReturnTemp);
+                    break;
+                case 57:
+                    sprintf(boilerMaxSupplyTemp, "%.2f", tmp);
+                    ESP_LOGD(TAG, "Processing boilerMaxSupplyTemp %s", boilerMaxSupplyTemp);
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if (msgType == 0 || msgType == 1) { 
+            // Filter on READ-DATA (000 = 0) and WRITE-DATA (001 = 1)
+            // Register the property value as a floating point string with 2 decimals
+            // or as an integer string for some properties
+            switch (dataId) {
+                case 14:
+                    maxRelModLvl = (int) round(tmp);
+                    ESP_LOGD(TAG, "Processing maxRelModLvl %i", maxRelModLvl);
+                    break;
+                case 16:
+                    sprintf(roomSetpoint, "%.2f", tmp);
+                    ESP_LOGD(TAG, "Processing roomSetpoint %s", roomSetpoint);
+                    break;
+                case 24:
+                    sprintf(roomTemp, "%.2f", tmp);
+                    ESP_LOGD(TAG, "Processing roomTemp %s", roomTemp);
+                    break;
+                default:
+                    break;
+            }
         }
     }
-    else if (dataId == 15) {
+    else if (dataId == 15 and (msgType == 4 || msgType == 5)) {
+        // Filter on READ-ACK (100 = 4) and WRITE-ACK (101 = 5)
         // HB : max. boiler capacity       u8     0..255kW
         // LB : min. modulation level      u8     0..100% expressed as a percentage of the maximum capacity
 
@@ -339,7 +356,6 @@ void processSendRequest(char data[9]) {
         minModLvl = strtol(hex, NULL, 16); // Same here, 8 bit signed integer, so just convert from hex to dec.
         ESP_LOGD(TAG, "Processing maxBoilerCap %d and minModLvl %d", maxBoilerCap, minModLvl);
     }
-    // }
 }
 
 // Work In-Progress
@@ -785,13 +801,16 @@ void app_main()
     #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
     ESP_LOGD(TAG, "Starting presence detection");
     start_presence_detection();
-    #endif
 
     ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
     vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
 
-    ESP_LOGD(TAG, "Generic Setup complete");
+    // additional startup delay to make sure the first rount of presence detection before starting OpenTherm
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
 
+    #endif
+    ESP_LOGD(TAG, "Generic Setup complete");
     ESP_LOGD(TAG, "calling begin_opentherm()");
     begin_opentherm();
 

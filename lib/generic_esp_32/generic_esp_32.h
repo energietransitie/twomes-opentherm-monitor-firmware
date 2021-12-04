@@ -129,6 +129,7 @@ int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, cha
 int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
+void delete_bearer();
 char *get_bearer();
 void activate_device();
 void get_http(const char *url);

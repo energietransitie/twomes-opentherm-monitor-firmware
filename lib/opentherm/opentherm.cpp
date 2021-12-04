@@ -31,16 +31,18 @@ void openthermInterruptHandler(void *args) {
 				uint8_t halfSeconds = 0;
 				//Determine length of button press before taking action
 				while (!gpio_get_level(WIFI_RESET_BUTTON_GPIO16_SW1)) {
-					//Button BOOT is (still) pressed
+					//Button WIFI_RESET_BUTTON_GPIO16_SW1 is (still) pressed
 					vTaskDelay(500 / portTICK_PERIOD_MS); //Wait for 0.5s
 					halfSeconds++;
 					ESP_LOGI(TAG, "Button WIFI_RESET_BUTTON_GPIO16_SW1 has been pressed for %u half-seconds now", halfSeconds);
 					if (halfSeconds >= LONG_BUTTON_PRESS_DURATION) {
 						//Long press on WIFI_RESET_BUTTON_GPIO16_SW1 is for clearing Wi-Fi provisioning memory:
-						ESP_LOGI("ISR", "Long-button press detected on button BOOT; resetting Wi-Fi provisioning and restarting device");
+						ESP_LOGI("ISR", "Long-button press detected on button WIFI_RESET_BUTTON_GPIO16_SW1; resetting Wi-Fi provisioning and restarting device");
 						char blinkArgs[2] = { 5, RED_LED_ERROR_GPIO22 };
 						xTaskCreatePinnedToCore(blink, "blink_5_times_red", 768, (void *)blinkArgs, 10, NULL, 1);
 						esp_wifi_restore();
+						// also remove bearer to force re-activation
+						delete_bearer();
 						vTaskDelay(5 * (200 + 200) / portTICK_PERIOD_MS); //Wait for blink to finish
 						esp_restart();                         //software restart, to enable linking to new Wi-Fi network.
 						break;                                 //Exit loop (this should not be reached)

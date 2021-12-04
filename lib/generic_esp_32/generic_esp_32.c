@@ -116,6 +116,8 @@ void buttonPressHandlerGeneric(void *args) {
                         char blinkArgs[2] = { 5, RED_LED_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink_5_times_red", 768, (void *)blinkArgs, 10, NULL, 1);
                         esp_wifi_restore();
+                        // also remove bearer to force re-activation
+						delete_bearer();
                         vTaskDelay(5 * (200 + 200) / portTICK_PERIOD_MS); //Wait for blink to finish
                         esp_restart();                         //software restart, to enable linking to new Wi-Fi network.
                         break;                                 //Exit loop (this should not be reached)
@@ -655,6 +657,18 @@ esp_err_t store_bearer(char *activation_response) {
     return err;
 }
 
+void delete_bearer() {
+    esp_err_t err;
+    bearer = "";
+    err = store_bearer(""); 
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "Bearer reset to force re-activation");
+    }
+    else {
+        ESP_LOGE(TAG, "Error (%s) storing empty bearer value into nvs!", esp_err_to_name(err));
+    }
+}
+
 char *get_bearer() {
     if (bearer != NULL) {
         ESP_LOGD(TAG, "Existing bearer read from memory: %s", bearer);
@@ -728,7 +742,7 @@ void activate_device() {
             ESP_LOGD(TAG, "Final bearer_trimmed %i characters: %s", strlen(bearer_trimmed), bearer_trimmed);
             if (store_bearer(bearer_trimmed) == ESP_OK) {
                 bearer = strdup(bearer_trimmed); //copy the trimmed bearer into the global bearer variable.
-                ESP_LOGD(TAG, "Final bearer: %i characters: %s", strlen(bearer), bearer);
+                ESP_LOGD(TAG, "Final bearer stored: %i characters: %s", strlen(bearer), bearer);
             }
             else {
                 ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));

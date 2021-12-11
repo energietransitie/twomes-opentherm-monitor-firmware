@@ -17,18 +17,29 @@
 #define TIMER_DIVIDER 80
 #define ADDR_LEN 17 // 6 * 2 hex digits + 5 colons
 
-// #define PHONE_ONE { 0x12, 0x34, 0x56, 0x78, 0x90, 0xAB };
-// #define PHONE_TWO { 0x09, 0x87, 0x65, 0x54, 0x43, 0x21 };
-// #define PHONE_THREE = {}
+#define PHONE_ONE esp_bd_addr_t phone = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+#define PHONE_TWO esp_bd_addr_t phone2 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+// #define PHONE_THREE esp_bd_addr_t phone3 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+// #define PHONE_FOUR esp_bd_addr_t phone4 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 
 esp_gatt_if_t interface;
 
+#if defined(PHONE_FOUR)
+#pragma message "Using 4 phones"
+PHONE_ONE
+PHONE_TWO
+PHONE_THREE
+PHONE_FOUR
 
-#if defined(PHONE_THREE)
+esp_bd_addr_t presence_addr_list[4] = {};
+int presence_addr_list_count = 4;
+presence_data result_list[4];
+#elif defined(PHONE_THREE)
 #pragma message "Using 3 phones"
-esp_bd_addr_t phone = PHONE_ONE
-esp_bd_addr_t phone2 = PHONE_TWO
-esp_bd_addr_t phone3 = PHONE_THREE
+PHONE_ONE
+PHONE_TWO
+PHONE_THREE
 
 esp_bd_addr_t presence_addr_list[3] = {};
 int presence_addr_list_count = 3;
@@ -36,8 +47,8 @@ presence_data result_list[3];
 
 #elif defined(PHONE_TWO)
 #pragma message "Using 2 phones"
-esp_bd_addr_t phone = PHONE_ONE
-esp_bd_addr_t phone2 = PHONE_TWO
+PHONE_ONE
+PHONE_TWO
 
 esp_bd_addr_t presence_addr_list[2] = {};
 int presence_addr_list_count = 2;
@@ -45,7 +56,7 @@ presence_data result_list[2];
 
 #elif defined(PHONE_ONE)
 #pragma message "Using 1 phones"
-esp_bd_addr_t phone = PHONE_ONE
+PHONE_ONE
 
 
 esp_bd_addr_t presence_addr_list[1] = {};
@@ -53,8 +64,8 @@ int presence_addr_list_count = 1;
 presence_data result_list[1];
 #else
 #pragma message "No phones defined"
-#error "Presence detection is included but no addresses are supplied"
-esp_bd_addr_t phone = { 0,0,0,0,0,0 }
+// #error "Presence detection is included but no addresses are supplied"
+esp_bd_addr_t phone = { 0,0,0,0,0,0 };
 esp_bd_addr_t presence_addr_list[1] = {};
 int presence_addr_list_count = 1;
 presence_data result_list[1];
@@ -141,11 +152,15 @@ void initialize_presence_detection() {
 #endif
 #if defined(PHONE_TWO)
 #pragma message "phone 2 copy is in"
-    memcpy(presence_addr_list[1], phone2, sizeof(esp_bd_addr_t));
+    memcpy(presence_addr_list[1], phone1, sizeof(esp_bd_addr_t));
 #endif
 #if defined(PHONE_THREE)
 #pragma message "phone 3 copy is in"
-    memcpy(presence_addr_list[2], phone3, sizeof(esp_bd_addr_t));
+    memcpy(presence_addr_list[2], phone2, sizeof(esp_bd_addr_t));
+#endif
+#if defined(PHONE_FOUR)
+#pragma message "phone 3 copy is in"
+    memcpy(presence_addr_list[3], phone3, sizeof(esp_bd_addr_t));
 #endif
 }
 

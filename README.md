@@ -13,7 +13,22 @@ For the associated hardware design files for the OpenTherm Monitor Shield and en
 * [Credits](#credits)
 
 ## General info
-The OpenTherm Monitor should be connected via one wire pair to a [boiler that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#boilers) and via another wire pair to a [thermostat that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#thermostats). 
+The OpenTherm Monitor should be connected via one wire pair to a [boiler that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#boilers) and via another wire pair to a [thermostat that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#thermostats). It sends the following properties to the Twomes server:
+
+| OpenTherm ID | Part | Property                   | Unit | Data type | Description               |
+| ------------ | ---- | -------------------------- | ---- | --------- | ------------------------- |
+| 0            | LB/1 | `isCentralHeatingModeOn`   |      | boolean   | STATUS/CH mode            |
+| 0            | LB/2 | `isDomesticHotWaterModeOn` |      | boolean   | STATUS/DHW mode           |
+| 0            | LB/3 | `isBoilerFlameOn`          |      | boolean   | STATUS /Flame status      |
+| 14           |      | `maxModulationLevel`       | %    | float     | CAPACITY SETTING          |
+| 15           | HB   | `maxBoilerCap`             | kW   | float     | MAX CAPACITY              |
+| 15           | LB   | `minModulationLevel`       | %    | float     | MIN-MOD-LEVEL             |
+| 16           |      | `roomSetpointTemp`         | °C   | float     | ROOM SETPOINT             |
+| 17           |      | `relativeModulationLevel`  | %    | int       | RELATIVE MODULATION LEVEL |
+| 24           |      | `roomTemp`                 | °C   | float     | ROOM TEMPERATURE          |
+| 25           |      | `boilerSupplyTemp`         | °C   | float     | BOILER WATER TEMP.        |
+| 28           |      | `boilerReturnTemp`         | °C   | float     | RETURN WATER TEMPERATURE  |
+| 57           |      | `boilerMaxSupplyTemp`      | °C   | float     | MAX CH WATER SETPOINT     |
 
 This is device  is NOT an OpenTherm gateway; it only monitors OpenTherm traffic and it cannot insert OpenTherm commands to the boiler or thermostat.
 

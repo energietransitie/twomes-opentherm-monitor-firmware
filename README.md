@@ -1,11 +1,10 @@
 # Twomes OpenTherm Monitor firmware
-This repository contains the firmware and pointerr to binary releases for the  Twomes OpenTherm Monitor. 
+This repository contains the firmware and pointers to binary releases for the  Twomes OpenTherm Monitor. 
 
 For the associated hardware design files for the OpenTherm Monitor Shield and enclosure and tips and instructions how to produce and assemble the hardware, please see the [twomes-opentherm-monitor-hardware](https://github.com/energietransitie/twomes-opentherm-monitor-hardware) repository. 
 
 ## Table of contents
 * [General info](#general-info)
-* [Prerequisites](#prerequisites)
 * [Deploying](#deploying)
 * [Developing](#developing) 
 * [Features](#features)
@@ -18,30 +17,40 @@ The OpenTherm Monitor should be connected via one wire pair to a [boiler that su
 
 This is device  is NOT an OpenTherm gateway; it only monitors OpenTherm traffic and it cannot insert OpenTherm commands to the boiler or thermostat.
 
+## Deploying
+This section describes how you can deploy binary releases of the firmware, i.e. without changing the source code, without a development environment and without needing to compile the source code.
 
-## Prerequisites
+### Prerequisites
 In addition to the [prerequisites described in the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#prerequisites), you need:
 * a [Twomes OpenTherm Monitor Shield](https://github.com/energietransitie/twomes-opentherm-monitor-hardware)
 
-## Deploying
+### Erasing all persistenly stored data
 See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
 
+### Device preparation
+See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
+
+### Erasing only Wi-Fi provisioning data
+See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
+
+Specific for te OpenTherm Monitor::
+* hold down the button mounted counterclockwise (viewed from above) compared to the connectors for more than 10 seconds;
+* power down and power up the OpenTherm Monitor;
+* start the Wi-Fi provisioning process again. 
 
 ## Developing
-Describe how the reader can use / adapt/ compile the souce code. 
-A good tip is also to use the ESP-IDF VSCode plugin for building the main branch. Not needed for OpenTherm-Port branch: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/vscode-setup.html.
+This section describes how you can change the source code using a development environment and compile the source code into a binary release of the firmware that can be depoyed, either via the development environment, or via the method described in the section Deploying.
 
 ## Features
-List of features ready and TODOs for future development. Ready:
+List of features ready and TODOs for future development (other than the [features of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#features)). 
 
-* awesome feature 1;
-* awesome feature 2;
-* awesome feature 3.
+Ready:
+* Read and timestamp OpenTherm messages as indicated in the table above.
+* Send the data collected to a Twomes server.
+* Reset Wi-Fi provisioning by a long press (>10s) on the recessed button accessible through a pinhole in the encosure, mounted counterclockwise (viewed from above) from the connectors. 
 
 To-do:
-
-* wow improvement to be done 1;
-* wow improvement to be done 2.
+* Align indication of status and error via LEDs with other measurement devices
 
 ## Status
 Project is: _in progress_
@@ -50,14 +59,14 @@ Project is: _in progress_
 This software is available under the [Apache 2.0 license](./LICENSE), Copyright 2021 [Research group Energy Transition, Windesheim University of Applied Sciences](https://windesheim.nl/energietransitie) 
 
 ## Credits
-This software is a collaborative effort the following students and researchers:
-* <contributor name 1> ·  [@Github_handle_1](https://github.com/<github_handle_1>) ·  Twitter [@Twitter_handle_1](https://twitter.com/<twitter_handle_1>)
-* <contributor name 2> ·  [@Github_handle_2](https://github.com/<github_handle_2>) ·  Twitter [@Twitter_handle_2](https://twitter.com/<twitter_handle_2>)
-* <contributor name 3> ·  [@Github_handle_3](https://github.com/<github_handle_3>) ·  Twitter [@Twitter_handle_3](https://twitter.com/<twitter_handle_3>)
-* etc. 
+This software is a collaborative effort of :
+* Kevin Jansen ·  [@KevinJan18](https://github.com/KevinJan18)
+* Henri ter Hofte · [@henriterhofte](https://github.com/henriterhofte) · Twitter [@HeNRGi](https://twitter.com/HeNRGi)
+* Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 
+Thanks also go to:
+* Arjen Korevaar ·  [@GArjenKorevaar](https://github.com/ArjenKorevaar)
+* Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 
 We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
-
-* [Arduino](https://github.com/arduino/Arduino), by the Arduino team, licensed under [GNU LGPL v2.1](https://github.com/arduino/Arduino/blob/master/license.txt)
 * [OpenTherm Arduino/ESP8266 Library](https://github.com/ihormelnyk/opentherm_library/), by Ihor Melnyk, licensed under [MIT License](https://github.com/ihormelnyk/opentherm_library/blob/master/LICENSE)

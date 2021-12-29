@@ -15,20 +15,20 @@ For the associated hardware design files for the OpenTherm Monitor Shield and en
 ## General info
 The OpenTherm Monitor should be connected via one wire pair to a [boiler that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#boilers) and via another wire pair to a [thermostat that supports OpenTherm](https://www.otgw.tclcode.com/matrix.cgi#thermostats). It sends the following properties to the Twomes server:
 
-| OpenTherm ID | Part | Property                   | Unit | Data type | Description               |
-| ------------ | ---- | -------------------------- | ---- | --------- | ------------------------- |
-| 0            | LB/1 | `isCentralHeatingModeOn`   |      | boolean   | STATUS/CH mode            |
-| 0            | LB/2 | `isDomesticHotWaterModeOn` |      | boolean   | STATUS/DHW mode           |
-| 0            | LB/3 | `isBoilerFlameOn`          |      | boolean   | STATUS /Flame status      |
-| 14           |      | `maxModulationLevel`       | %    | float     | CAPACITY SETTING          |
-| 15           | HB   | `maxBoilerCap`             | kW   | float     | MAX CAPACITY              |
-| 15           | LB   | `minModulationLevel`       | %    | float     | MIN-MOD-LEVEL             |
-| 16           |      | `roomSetpointTemp`         | °C   | float     | ROOM SETPOINT             |
-| 17           |      | `relativeModulationLevel`  | %    | int       | RELATIVE MODULATION LEVEL |
-| 24           |      | `roomTemp`                 | °C   | float     | ROOM TEMPERATURE          |
-| 25           |      | `boilerSupplyTemp`         | °C   | float     | BOILER WATER TEMP.        |
-| 28           |      | `boilerReturnTemp`         | °C   | float     | RETURN WATER TEMPERATURE  |
-| 57           |      | `boilerMaxSupplyTemp`      | °C   | float     | MAX CH WATER SETPOINT     |
+| OpenTherm ID | Part | Property                   | Unit | [Printf format](https://en.wikipedia.org/wiki/Printf_format_string) | Measurement interval \[h:mm:ss\] | Description               |
+| ------------ | ---- | -------------------------- | ---- | ------------- | -------------------------------- | ------------------------- |
+| 0            | LB/3 | `isBoilerFlameOn`          |      | 0/1           | 0:00:30                          | STATUS /Flame status      |
+| 0            | LB/1 | `isCentralHeatingModeOn`   |      | 0/1           | 0:00:30                          | STATUS/CH mode            |
+| 0            | LB/2 | `isDomesticHotWaterModeOn` |      | 0/1           | 0:00:30                          | STATUS/DHW mode           |
+| 14           |      | `maxModulationLevel`       | %    | %d            | 0:00:30                          | CAPACITY SETTING          |
+| 15           | HB   | `maxBoilerCap`             | kW   | %d            | 0:00:30                          | MAX CAPACITY              |
+| 15           | LB   | `minModulationLevel`       | %    | %d            | 0:00:30                          | MIN-MOD-LEVEL             |
+| 16           |      | `roomSetpointTemp`         | °C   | %.2f          | 0:05:00                          | ROOM SETPOINT             |
+| 17           |      | `relativeModulationLevel`  | %    | %d            | 0:00:30                          | RELATIVE MODULATION LEVEL |
+| 24           |      | `roomTemp`                 | °C   | %.2f          | 0:05:00                          | ROOM TEMPERATURE          |
+| 57           |      | `boilerMaxSupplyTemp`      | °C   | %.2f          | 0:05:00                          | MAX CH WATER SETPOINT     |
+| 25           |      | `boilerSupplyTemp`         | °C   | %.2f          | 0:00:10                          | BOILER WATER TEMP.        |
+| 28           |      | `boilerReturnTemp`         | °C   | %.2f          | 0:00:10                          | RETURN WATER TEMPERATURE  |
 
 This is device  is NOT an OpenTherm gateway; it only monitors OpenTherm traffic and it cannot insert OpenTherm commands to the boiler or thermostat.
 
@@ -83,5 +83,5 @@ Thanks also go to:
 * Arjen Korevaar ·  [@GArjenKorevaar](https://github.com/ArjenKorevaar)
 * Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 
-We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
+We use and gratefully acknowlegde the efforts of the makers of the following source code and libraries:
 * [OpenTherm Arduino/ESP8266 Library](https://github.com/ihormelnyk/opentherm_library/), by Ihor Melnyk, licensed under [MIT License](https://github.com/ihormelnyk/opentherm_library/blob/master/LICENSE)

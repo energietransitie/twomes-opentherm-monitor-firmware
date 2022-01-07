@@ -48,13 +48,15 @@ See [Deploying section of the generic firmware for Twomes measurement devices](h
 ### Erasing only Wi-Fi provisioning data
 See [Deploying section of the generic firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware#deploying).
 
-Specific for te OpenTherm Monitor::
+Specific for the OpenTherm Monitor::
 * hold down the button mounted counterclockwise (viewed from above) compared to the connectors for more than 10 seconds;
 * power down and power up the OpenTherm Monitor;
 * start the Wi-Fi provisioning process again. 
 
 ## Developing
 This section describes how you can change the source code using a development environment and compile the source code into a binary release of the firmware that can be depoyed, either via the development environment, or via the method described in the section Deploying.
+
+Please see the [developing section of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing).
 
 ## Features
 List of features ready and TODOs for future development (other than the [features of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#features)). 
@@ -65,7 +67,7 @@ Ready:
 * Reset Wi-Fi provisioning by a long press (>10s) on the recessed button accessible through a pinhole in the encosure, mounted counterclockwise (viewed from above) from the connectors. 
 
 To-do:
-* Align indication of status and error via LEDs with other measurement devices
+* Align indication of status and error via LEDs with other measurement devices.
 
 ## Status
 Project is: _in progress_

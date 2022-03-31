@@ -70,13 +70,13 @@
 extern xSemaphoreHandle wireless_802_11_mutex;
 
 #ifdef CONFIG_TWOMES_TEST_SERVER
-#define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"
-#define TWOMES_SERVER "https://api.tst.energietransitiewindesheim.nl"
+#define TWOMES_SERVER_HOSTNAME "api.tst.energiebeveiliging.nl"
+#define TWOMES_SERVER "https://api.tst.energiebeveiliging.nl"
 #endif
 
 #ifdef CONFIG_TWOMES_PRODUCTION_SERVER
-#define TWOMES_SERVER_HOSTNAME "api.energietransitiewindesheim.nl"
-#define TWOMES_SERVER "https://api.energietransitiewindesheim.nl"
+#define TWOMES_SERVER_HOSTNAME "api.energiebeveiliging.nl"
+#define TWOMES_SERVER "https://api.energiebeveiliging.nl"
 #endif
 
 #define VARIABLE_UPLOAD_ENDPOINT "/device/measurements/variable-interval"

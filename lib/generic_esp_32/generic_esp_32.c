@@ -13,7 +13,7 @@ char *bearer = NULL;
 
 xSemaphoreHandle wireless_802_11_mutex;
 
-// Twomes servers at *.energietransitiewindesheim.nl use Let's Encrypt certificates
+// Twomes servers at *.energiebeveiliging.nl use Let's Encrypt certificates
 // based on https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
 // we use the ISRG Root X1 certificate found at https://letsencrypt.org/certs/isrgrootx1.pem
 // this certificate was translated to ESP32 code
